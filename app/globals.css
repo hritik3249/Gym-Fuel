@@ -25,7 +25,6 @@
     --ring: 160 84% 32%;
     --radius: 0.5rem;
   }
-
   .dark {
     --background: 222 28% 8%;
     --foreground: 210 30% 96%;
@@ -47,14 +46,8 @@
     --input: 217 22% 23%;
     --ring: 158 74% 43%;
   }
-
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground antialiased;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased; }
 }
 
 @layer utilities {

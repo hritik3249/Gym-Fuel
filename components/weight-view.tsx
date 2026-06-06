@@ -1,5 +1,4 @@
 "use client";
-
 import { Plus, Ruler, Scale, TrendingDown } from "lucide-react";
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -12,7 +11,6 @@ import type { WeightLog } from "@/lib/types";
 
 export function WeightView({ logs }: { logs: WeightLog[] }) {
   useRealtimeRefresh(["weight_logs"]);
-
   const [weightLogs, setWeightLogs] = useState(logs);
   const [weight, setWeight] = useState("");
   const [bodyFat, setBodyFat] = useState("");
@@ -24,19 +22,8 @@ export function WeightView({ logs }: { logs: WeightLog[] }) {
   function addLog() {
     const parsed = Number(weight);
     if (!parsed) return;
-    setWeightLogs((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        loggedAt: new Date().toISOString(),
-        weightKg: parsed,
-        bodyFatPercent: bodyFat ? Number(bodyFat) : undefined,
-        waistCm: waist ? Number(waist) : undefined
-      }
-    ]);
-    setWeight("");
-    setBodyFat("");
-    setWaist("");
+    setWeightLogs((c) => [...c, { id: crypto.randomUUID(), loggedAt: new Date().toISOString(), weightKg: parsed, bodyFatPercent: bodyFat ? Number(bodyFat) : undefined, waistCm: waist ? Number(waist) : undefined }]);
+    setWeight(""); setBodyFat(""); setWaist("");
   }
 
   return (
@@ -45,29 +32,19 @@ export function WeightView({ logs }: { logs: WeightLog[] }) {
         <p className="text-sm font-semibold text-primary">Body progress</p>
         <h2 className="mt-1 text-3xl font-bold tracking-tight">Scale trend over daily noise</h2>
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          {[
-            ["Current weight", `${latest?.weightKg ?? 0}kg`, Scale],
-            ["Weekly change", `${weekAgo && latest ? (latest.weightKg - weekAgo.weightKg).toFixed(1) : "0.0"}kg`, TrendingDown],
-            ["Monthly change", `${monthStart && latest ? (latest.weightKg - monthStart.weightKg).toFixed(1) : "0.0"}kg`, Ruler]
-          ].map(([label, value, Icon]) => (
-            <Card key={label as string} className="bg-background/75">
+          {([[`Current weight`, `${latest?.weightKg ?? 0}kg`, Scale], [`Weekly change`, `${weekAgo && latest ? (latest.weightKg - weekAgo.weightKg).toFixed(1) : "0.0"}kg`, TrendingDown], [`Monthly change`, `${monthStart && latest ? (latest.weightKg - monthStart.weightKg).toFixed(1) : "0.0"}kg`, Ruler]] as const).map(([label, value, Icon]) => (
+            <Card key={label} className="bg-background/75">
               <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">{label as string}</p>
-                  <p className="mt-1 text-3xl font-bold">{value as string}</p>
-                </div>
+                <div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-3xl font-bold">{value}</p></div>
                 <Icon className="size-7 text-primary" />
               </CardContent>
             </Card>
           ))}
         </div>
       </section>
-
       <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <Card>
-          <CardHeader>
-            <CardTitle>Weight Trend</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Weight Trend</CardTitle></CardHeader>
           <CardContent className="h-96">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={weightLogs.map((item) => ({ date: item.loggedAt.slice(5, 10), weight: item.weightKg }))}>
@@ -81,26 +58,12 @@ export function WeightView({ logs }: { logs: WeightLog[] }) {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Log Measurement</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Log Measurement</CardTitle></CardHeader>
           <CardContent className="grid gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="weight">Weight kg</Label>
-              <Input id="weight" value={weight} onChange={(event) => setWeight(event.target.value)} inputMode="decimal" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="body-fat">Body fat %</Label>
-              <Input id="body-fat" value={bodyFat} onChange={(event) => setBodyFat(event.target.value)} inputMode="decimal" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="waist">Waist cm</Label>
-              <Input id="waist" value={waist} onChange={(event) => setWaist(event.target.value)} inputMode="decimal" />
-            </div>
-            <Button onClick={addLog}>
-              <Plus className="size-4" />
-              Add log
-            </Button>
+            <div className="grid gap-2"><Label htmlFor="weight">Weight kg</Label><Input id="weight" value={weight} onChange={(e) => setWeight(e.target.value)} inputMode="decimal" /></div>
+            <div className="grid gap-2"><Label htmlFor="body-fat">Body fat %</Label><Input id="body-fat" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} inputMode="decimal" /></div>
+            <div className="grid gap-2"><Label htmlFor="waist">Waist cm</Label><Input id="waist" value={waist} onChange={(e) => setWaist(e.target.value)} inputMode="decimal" /></div>
+            <Button onClick={addLog}><Plus className="size-4" />Add log</Button>
           </CardContent>
         </Card>
       </section>

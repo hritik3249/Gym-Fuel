@@ -11,7 +11,11 @@ type CookieToSet = {
 function hasSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  return Boolean(url && key && !url.includes("example.supabase.co") && !key.includes("placeholder"));
+  return Boolean(
+    url && key &&
+    !url.includes("example.supabase.co") &&
+    !key.includes("placeholder")
+  );
 }
 
 export async function middleware(request: NextRequest) {
@@ -30,9 +34,13 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet: CookieToSet[]) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
         }
       }
     }
@@ -52,5 +60,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/auth/:path*"]
+  matcher: ["/app/:path*", "/auth/:path*"],
+  runtime: "nodejs"
 };

@@ -7,18 +7,11 @@ export const metadata: Metadata = {
   title: "FuelTrack",
   description: "Nutrition, calorie, micronutrient, hydration, and weight tracking.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "FuelTrack",
-    statusBarStyle: "black-translucent"
-  }
+  appleWebApp: { capable: true, title: "FuelTrack", statusBarStyle: "black-translucent" }
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1720" }
-  ],
+  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f7fafc" }, { media: "(prefers-color-scheme: dark)", color: "#0f1720" }],
   width: "device-width",
   initialScale: 1
 };

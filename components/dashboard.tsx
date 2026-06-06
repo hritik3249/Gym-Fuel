@@ -1,17 +1,6 @@
 "use client";
-
 import { Activity, Award, Flame, GlassWater, Scale, Utensils } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ProgressRing } from "@/components/progress-ring";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -20,32 +9,9 @@ import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { clampProgress, formatNumber } from "@/lib/utils";
 import type { DailyTrend, FoodEntry, Goal, Nutrients, WeightLog } from "@/lib/types";
 
-const metricTones = {
-  calories: "emerald",
-  protein: "sky",
-  carbs: "amber",
-  fat: "rose"
-} as const;
+const metricTones = { calories: "emerald", protein: "sky", carbs: "amber", fat: "rose" } as const;
 
-export function Dashboard({
-  goals,
-  totals,
-  water,
-  weight,
-  entries,
-  trends,
-  weights,
-  streak
-}: {
-  goals: Goal;
-  totals: Nutrients;
-  water: number;
-  weight: number;
-  entries: FoodEntry[];
-  trends: DailyTrend[];
-  weights: WeightLog[];
-  streak: number;
-}) {
+export function Dashboard({ goals, totals, water, weight, entries, trends, weights, streak }: { goals: Goal; totals: Nutrients; water: number; weight: number; entries: FoodEntry[]; trends: DailyTrend[]; weights: WeightLog[]; streak: number; }) {
   useRealtimeRefresh(["food_entries", "water_logs", "weight_logs", "goals"]);
 
   const macros = [
@@ -56,8 +22,7 @@ export function Dashboard({
   ] as const;
 
   const mealTotals = ["breakfast", "lunch", "dinner", "snacks"].map((meal) => ({
-    meal,
-    calories: entries.filter((entry) => entry.meal === meal).reduce((sum, entry) => sum + entry.calories, 0)
+    meal, calories: entries.filter((e) => e.meal === meal).reduce((sum, e) => sum + e.calories, 0)
   }));
 
   return (
@@ -68,48 +33,24 @@ export function Dashboard({
             <div>
               <p className="text-sm font-semibold text-primary">Today</p>
               <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Fuel plan is 73% complete</h2>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Calories are on pace, protein is strong, and hydration needs one more focused push.
-              </p>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Calories are on pace, protein is strong, and hydration needs one more focused push.</p>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2">
               <Flame className="size-5 text-orange-500" />
-              <div>
-                <p className="text-xs text-muted-foreground">Streak</p>
-                <p className="font-bold">{streak} days</p>
-              </div>
+              <div><p className="text-xs text-muted-foreground">Streak</p><p className="font-bold">{streak} days</p></div>
             </div>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {macros.map((macro) => (
-              <ProgressRing
-                key={macro.key}
-                label={macro.label}
-                value={macro.value}
-                goal={macro.goal}
-                unit={macro.unit}
-                tone={metricTones[macro.key]}
-              />
-            ))}
+            {macros.map((macro) => <ProgressRing key={macro.key} label={macro.label} value={macro.value} goal={macro.goal} unit={macro.unit} tone={metricTones[macro.key]} />)}
           </div>
         </div>
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <GlassWater className="size-4 text-sky-500" />
-              Water
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><GlassWater className="size-4 text-sky-500" />Water</CardTitle></CardHeader>
           <CardContent>
             <ProgressRing label="Hydration" value={water / 1000} goal={goals.waterMl / 1000} unit="L" tone="sky" />
             <div className="mt-4 grid grid-cols-4 gap-2">
               {[250, 500, 750, 1000].map((amount) => (
-                <button
-                  key={amount}
-                  className="rounded-md border border-border bg-background py-2 text-xs font-semibold hover:bg-accent"
-                >
-                  {amount === 1000 ? "1L" : `${amount}ml`}
-                </button>
+                <button key={amount} className="rounded-md border border-border bg-background py-2 text-xs font-semibold hover:bg-accent">{amount === 1000 ? "1L" : `${amount}ml`}</button>
               ))}
             </div>
           </CardContent>
@@ -118,12 +59,7 @@ export function Dashboard({
 
       <section className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="size-4 text-primary" />
-              Nutrition Trend
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Activity className="size-4 text-primary" />Nutrition Trend</CardTitle></CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trends}>
@@ -138,12 +74,7 @@ export function Dashboard({
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Utensils className="size-4 text-amber-500" />
-              Meal Totals
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Utensils className="size-4 text-amber-500" />Meal Totals</CardTitle></CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={mealTotals}>
@@ -159,22 +90,11 @@ export function Dashboard({
 
       <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Scale className="size-4 text-violet-500" />
-              Body Progress
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Scale className="size-4 text-violet-500" />Body Progress</CardTitle></CardHeader>
           <CardContent>
             <div className="flex items-end justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Current weight</p>
-                <p className="text-4xl font-bold">{formatNumber(weight, 1)}kg</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">Target</p>
-                <p className="text-xl font-bold">{defaultGoals.targetWeightKg}kg</p>
-              </div>
+              <div><p className="text-sm text-muted-foreground">Current weight</p><p className="text-4xl font-bold">{formatNumber(weight, 1)}kg</p></div>
+              <div className="text-right"><p className="text-sm text-muted-foreground">Target</p><p className="text-xl font-bold">{defaultGoals.targetWeightKg}kg</p></div>
             </div>
             <div className="mt-5 h-44">
               <ResponsiveContainer width="100%" height="100%">
@@ -189,9 +109,7 @@ export function Dashboard({
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Micronutrient Coverage</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Micronutrient Coverage</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {(Object.keys(nutrientTargets) as Array<keyof typeof nutrientTargets>).map((key) => {
               const consumed = totals[key];
@@ -201,15 +119,9 @@ export function Dashboard({
                 <div key={key} className="rounded-lg border border-border bg-background p-3">
                   <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                     <span className="font-semibold">{key.replace(/([A-Z])/g, " $1")}</span>
-                    <span className="text-muted-foreground">
-                      {formatNumber(consumed, 1)} / {target}
-                      {nutrientUnits[key]}
-                    </span>
+                    <span className="text-muted-foreground">{formatNumber(consumed, 1)} / {target}{nutrientUnits[key]}</span>
                   </div>
-                  <Progress
-                    value={progress}
-                    indicatorClassName={progress < 60 ? "bg-rose-500" : progress < 90 ? "bg-amber-500" : "bg-emerald-500"}
-                  />
+                  <Progress value={progress} indicatorClassName={progress < 60 ? "bg-rose-500" : progress < 90 ? "bg-amber-500" : "bg-emerald-500"} />
                 </div>
               );
             })}
@@ -218,18 +130,11 @@ export function Dashboard({
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        {[
-          ["Weekly adherence", "84%", "Goal days hit this week"],
-          ["Avg protein", "147g", "7-day rolling average"],
-          ["Monthly change", "-1.8kg", "Weight trend direction"]
-        ].map(([title, value, detail]) => (
+        {[["Weekly adherence", "84%", "Goal days hit this week"], ["Avg protein", "147g", "7-day rolling average"], ["Monthly change", "-1.8kg", "Weight trend direction"]].map(([title, value, detail]) => (
           <Card key={title}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{title}</p>
-                  <p className="mt-1 text-3xl font-bold">{value}</p>
-                </div>
+                <div><p className="text-sm text-muted-foreground">{title}</p><p className="mt-1 text-3xl font-bold">{value}</p></div>
                 <Award className="size-8 text-primary" />
               </div>
               <p className="mt-2 text-sm text-muted-foreground">{detail}</p>

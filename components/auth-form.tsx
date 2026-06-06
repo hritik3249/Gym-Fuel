@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chrome, Loader2, Mail } from "lucide-react";
@@ -32,39 +31,21 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
       return;
     }
 
-    const action =
-      mode === "login"
-        ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/app/dashboard`
-            }
-          });
+    const action = mode === "login"
+      ? supabase.auth.signInWithPassword({ email, password })
+      : supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/app/dashboard` } });
 
     const { error } = await action;
     setLoading(false);
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
+    if (error) { setMessage(error.message); return; }
     router.push("/app/dashboard");
     router.refresh();
   }
 
   async function googleLogin() {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/app/dashboard`
-      }
-    });
-    if (error) {
-      setMessage(error.message);
-      setLoading(false);
-    }
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/app/dashboard` } });
+    if (error) { setMessage(error.message); setLoading(false); }
   }
 
   const title = mode === "login" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset password";
@@ -72,26 +53,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">{title}</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-2xl">{title}</CardTitle></CardHeader>
         <CardContent>
           <form className="grid gap-4" onSubmit={submit}>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             {mode !== "reset" && (
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  minLength={8}
-                  required
-                />
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
               </div>
             )}
             <Button disabled={loading}>
