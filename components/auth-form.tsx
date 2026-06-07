@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Chrome, Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/browser";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,32 +23,40 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
 
     if (mode === "reset") {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/login`
+        redirectTo: `${window.location.origin}/auth/login`
       });
-      setMessage(error?.message ?? "Password reset email sent.");
+      setMessage(error?.message ?? "Password reset email sent. Check your inbox.");
       setLoading(false);
       return;
     }
 
-    const action =
-      mode === "login"
-        ? supabase.auth.signInWithPassword({ email, password })
-        : supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`
-            }
-          });
-
-    const { error } = await action;
-    setLoading(false);
-    if (error) {
-      setMessage(error.message);
+    if (mode === "signup") {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      setLoading(false);
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+      setMessage("Check your email to confirm your account, then log in.");
       return;
     }
-    router.push("/app/dashboard");
-    router.refresh();
+
+    // Login
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Hard redirect so the session cookie is fully set before Next.js renders
+    window.location.href = "/app/dashboard";
   }
 
   async function googleLogin() {
@@ -58,7 +64,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`
+        redirectTo: `${window.location.origin}/auth/callback`
       }
     });
     if (error) {
@@ -82,16 +88,34 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
           <form className="grid gap-4" onSubmit={submit}>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
             {mode !== "reset" && (
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={8}
+                  required
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                />
               </div>
             )}
             <Button disabled={loading}>
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+              {loading
+                ? <Loader2 className="size-4 animate-spin" />
+                : <Mail className="size-4" />
+              }
               {mode === "login" ? "Log in" : mode === "signup" ? "Sign up" : "Send reset link"}
             </Button>
           </form>
@@ -121,10 +145,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
 
           <div className="mt-5 flex justify-between text-sm">
             {mode !== "login"
-              ? <Link href="/auth/login">Log in</Link>
-              : <Link href="/auth/signup">Create account</Link>
+              ? <Link href="/auth/login" className="text-primary hover:underline">Log in</Link>
+              : <Link href="/auth/signup" className="text-primary hover:underline">Create account</Link>
             }
-            <Link href="/auth/reset-password">Forgot password?</Link>
+            <Link href="/auth/reset-password" className="text-primary hover:underline">Forgot password?</Link>
           </div>
         </CardContent>
       </Card>

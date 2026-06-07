@@ -48,13 +48,22 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  // Refresh session — this is critical, do NOT remove
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (request.nextUrl.pathname.startsWith("/app") && !user) {
+  const { pathname } = request.nextUrl;
+
+  // If on /app/* and not logged in → redirect to login
+  if (pathname.startsWith("/app") && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    return NextResponse.redirect(url);
+  }
+
+  // If logged in and on auth pages → redirect to dashboard
+  if (pathname.startsWith("/auth") && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/app/dashboard";
     return NextResponse.redirect(url);
   }
 
