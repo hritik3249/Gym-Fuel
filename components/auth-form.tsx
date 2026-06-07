@@ -23,7 +23,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
 
     if (mode === "reset") {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/login`
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/login`
       });
       setMessage(error?.message ?? "Password reset email sent. Check your inbox.");
       setLoading(false);
@@ -39,23 +39,18 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
         }
       });
       setLoading(false);
-      if (error) {
-        setMessage(error.message);
-        return;
-      }
+      if (error) { setMessage(error.message); return; }
       setMessage("Check your email to confirm your account, then log in.");
       return;
     }
 
-    // Login
+    // Login — hard redirect so session cookie is fully set
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
-
-    // Hard redirect so the session cookie is fully set before Next.js renders
     window.location.href = "/app/dashboard";
   }
 
@@ -64,7 +59,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent"
+        }
       }
     });
     if (error) {
@@ -112,10 +111,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
               </div>
             )}
             <Button disabled={loading}>
-              {loading
-                ? <Loader2 className="size-4 animate-spin" />
-                : <Mail className="size-4" />
-              }
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
               {mode === "login" ? "Log in" : mode === "signup" ? "Sign up" : "Send reset link"}
             </Button>
           </form>
