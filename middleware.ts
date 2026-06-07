@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
+export const runtime = "nodejs";
+
 type CookieToSet = {
   name: string;
   value: string;
@@ -60,6 +62,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/auth/:path*"],
-  runtime: "nodejs"   // ← THIS is the only change
+  matcher: ["/app/:path*", "/auth/:path*"]
 };
