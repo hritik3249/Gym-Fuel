@@ -40,7 +40,7 @@ export function OnboardingForm() {
             <Activity className="size-7" />
           </span>
           <h1 className="text-3xl font-bold">Welcome to FuelTrack</h1>
-          <p className="mt-2 text-muted-foreground">Let's set your daily goals to get started.</p>
+          <p className="mt-2 text-muted-foreground">Let&apos;s set your daily goals to get started.</p>
         </div>
 
         <Card>

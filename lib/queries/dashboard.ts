@@ -26,7 +26,6 @@ export async function getDashboardSnapshot() {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
 
   // Run all queries in parallel
   const [

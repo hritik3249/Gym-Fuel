@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Heart, Loader2, Pencil, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
+import { Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

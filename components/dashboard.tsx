@@ -6,7 +6,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { ProgressRing } from "@/components/progress-ring";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { defaultGoals, nutrientTargets, nutrientUnits } from "@/lib/nutrition";
+import { nutrientTargets, nutrientUnits } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { clampProgress, formatNumber } from "@/lib/utils";
 import { logWater } from "@/lib/actions/water";
