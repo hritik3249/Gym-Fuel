@@ -61,5 +61,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: ["/app/:path*", "/auth/:path*"],
-  runtime: "nodejs"
+  runtime: "nodejs"   // ← THIS is the only change
 };
