@@ -1,25 +1,21 @@
 "use client";
+
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Chrome, Loader2, Mail } from "lucide-react";
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/browser";
 
-function AuthFormInner({ mode }: { mode: "login" | "signup" | "reset" }) {
+export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const authError = searchParams.get("error");
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(
-    authError ? "Authentication failed. Please try again." : ""
-  );
+  const [message, setMessage] = useState("");
   const supabase = createClient();
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -31,7 +27,7 @@ function AuthFormInner({ mode }: { mode: "login" | "signup" | "reset" }) {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/login`
       });
-      setMessage(error?.message ?? "Password reset email sent. Check your inbox.");
+      setMessage(error?.message ?? "Password reset email sent.");
       setLoading(false);
       return;
     }
@@ -53,12 +49,6 @@ function AuthFormInner({ mode }: { mode: "login" | "signup" | "reset" }) {
       setMessage(error.message);
       return;
     }
-
-    if (mode === "signup") {
-      setMessage("Check your email to confirm your account.");
-      return;
-    }
-
     router.push("/app/dashboard");
     router.refresh();
   }
@@ -131,25 +121,13 @@ function AuthFormInner({ mode }: { mode: "login" | "signup" | "reset" }) {
 
           <div className="mt-5 flex justify-between text-sm">
             {mode !== "login"
-              ? <Link href="/auth/login" className="text-primary hover:underline">Log in</Link>
-              : <Link href="/auth/signup" className="text-primary hover:underline">Create account</Link>
+              ? <Link href="/auth/login">Log in</Link>
+              : <Link href="/auth/signup">Create account</Link>
             }
-            <Link href="/auth/reset-password" className="text-primary hover:underline">Forgot password?</Link>
+            <Link href="/auth/reset-password">Forgot password?</Link>
           </div>
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
-  return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    }>
-      <AuthFormInner mode={mode} />
-    </Suspense>
   );
 }
