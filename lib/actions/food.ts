@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Food, MealType, Nutrients } from "@/lib/types";
 
 const FOOD_PATHS = ["/app/dashboard", "/app/foods"] as const;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function revalidateFoodPaths() {
   for (const path of FOOD_PATHS) revalidatePath(path);
@@ -27,7 +28,7 @@ export async function logFoodEntry(entry: LoggableEntry) {
 
   const { error } = await supabase.from("food_entries").insert({
     user_id: user.id,
-    food_id: entry.foodId ?? null,
+    food_id: entry.foodId && UUID_PATTERN.test(entry.foodId) ? entry.foodId : null,
     food_name: entry.foodName,
     meal: entry.meal,
     serving: entry.serving,
