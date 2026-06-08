@@ -9,7 +9,6 @@ const RECENT_WEIGHT_LOGS = 30;
 const RECENT_FOODS = 50;
 
 export type DashboardSnapshot = {
-  displayName: string;
   goals: Goal;
   totals: ReturnType<typeof sumEntries>;
   water: number;
@@ -26,7 +25,6 @@ export type DashboardSnapshot = {
 
 function emptySnapshot(): DashboardSnapshot {
   return {
-    displayName: "",
     goals: defaultGoals,
     totals: emptyNutrients,
     water: 0,
@@ -256,7 +254,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       .order("created_at", { ascending: false })
       .limit(RECENT_FOODS),
     supabase.from("streaks").select("*").eq("user_id", user.id).single(),
-    supabase.from("profiles").select("display_name, current_weight_kg, age, fitness_goal").eq("id", user.id).single()
+    supabase.from("profiles").select("current_weight_kg, age, fitness_goal").eq("id", user.id).single()
   ]);
 
   // A user is "new" until they've completed onboarding and have goals saved.
@@ -273,11 +271,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   const currentWeight =
     weightLogs.at(-1)?.weightKg ?? (profileRes.data?.current_weight_kg ? Number(profileRes.data.current_weight_kg) : 0);
 
-  const displayName =
-    profileRes.data?.display_name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "";
-
   return {
-    displayName,
     goals: mapGoals(goalsRes.data),
     totals,
     water,

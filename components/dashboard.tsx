@@ -36,7 +36,6 @@ function formatWaterAmount(amountMl: number) {
 }
 
 export type DashboardProps = {
-  displayName: string;
   goals: Goal;
   totals: Nutrients;
   water: number;
@@ -47,7 +46,7 @@ export type DashboardProps = {
   streak: number;
 };
 
-export function Dashboard({ displayName, goals, totals, water, weight, entries, trends, weights, streak }: DashboardProps) {
+export function Dashboard({ goals, totals, water, weight, entries, trends, weights, streak }: DashboardProps) {
   useRealtimeRefresh(["food_entries", "water_logs", "weight_logs", "goals"]);
 
   const [waterTotal, setWaterTotal] = useState(water);
@@ -88,7 +87,6 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-primary">Today</p>
-              {displayName && <h1 className="mt-1 text-xl font-semibold text-foreground">Welcome, {displayName} 👋</h1>}
               <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Fuel plan is {percentComplete}% complete</h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{progressMessage(percentComplete)}</p>
             </div>

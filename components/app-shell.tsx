@@ -46,7 +46,7 @@ function NavLink({ href, label, icon: Icon, active, variant }: {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, displayName }: { children: React.ReactNode; displayName: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -88,8 +88,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur xl:ml-64">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground">FuelTrack</p>
-            <h1 className="text-lg font-bold">Nutrition OS</h1>
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Nutrition OS</p>
+            <h1 className="text-lg font-bold">{displayName ? `Welcome to FuelTrack, ${displayName}` : "FuelTrack"}</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button size="icon" variant="outline" aria-label="Quick add food" onClick={() => router.push("/app/foods")}>

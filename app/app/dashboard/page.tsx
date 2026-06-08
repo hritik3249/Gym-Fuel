@@ -8,7 +8,6 @@ export default async function DashboardPage() {
 
   return (
     <Dashboard
-      displayName={snapshot.displayName}
       goals={snapshot.goals}
       totals={snapshot.totals}
       water={snapshot.water}
