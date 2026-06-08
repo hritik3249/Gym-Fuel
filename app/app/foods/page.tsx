@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { FoodLogger } from "@/components/food-logger";
-import { getDashboardSnapshot } from "@/lib/queries/dashboard";
+import { getFoodsPageData } from "@/lib/queries/dashboard";
 
 export default async function FoodsPage() {
-  const snapshot = await getDashboardSnapshot();
-  if (snapshot.isNewUser) redirect("/app/onboarding");
+  const data = await getFoodsPageData();
+  if (data.isNewUser) redirect("/app/onboarding");
 
-  return <FoodLogger foods={snapshot.foods} initialEntries={snapshot.entries} />;
+  return <FoodLogger foods={data.foods} initialEntries={data.entries} />;
 }

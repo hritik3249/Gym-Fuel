@@ -136,6 +136,94 @@ function buildTrendFrame(weightLogs: WeightLog[]): DailyTrend[] {
   });
 }
 
+/** Resolves the current user and whether they've completed onboarding, via a single lightweight query. */
+async function requireSession() {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: goalsRow } = await supabase.from("goals").select("user_id").eq("user_id", user.id).maybeSingle();
+  return { supabase, user, isNewUser: !goalsRow };
+}
+
+export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; isNewUser: boolean };
+
+/** Lighter-weight fetch for the food logger page — skips goals, water, weight, streak, and trend data. */
+export async function getFoodsPageData(): Promise<FoodsPageData> {
+  const session = await requireSession();
+  if (!session) return { foods: [], entries: [], isNewUser: true };
+  const { supabase, user, isNewUser } = session;
+  if (isNewUser) return { foods: [], entries: [], isNewUser };
+
+  const today = todayISO();
+  const dayStart = `${today}T00:00:00`;
+  const dayEnd = `${today}T23:59:59`;
+
+  const [entriesRes, foodsRes] = await Promise.all([
+    supabase
+      .from("food_entries")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("logged_at", dayStart)
+      .lte("logged_at", dayEnd)
+      .order("logged_at", { ascending: false }),
+    supabase
+      .from("foods")
+      .select("*")
+      .or(`owner_id.eq.${user.id},owner_id.is.null`)
+      .order("created_at", { ascending: false })
+      .limit(RECENT_FOODS)
+  ]);
+
+  return {
+    foods: (foodsRes.data ?? []).map(mapFood),
+    entries: (entriesRes.data ?? []).map(mapEntry),
+    isNewUser
+  };
+}
+
+export type WeightPageData = { weightLogs: WeightLog[]; isNewUser: boolean };
+
+/** Lighter-weight fetch for the weight page — only the recent weight log history. */
+export async function getWeightPageData(): Promise<WeightPageData> {
+  const session = await requireSession();
+  if (!session) return { weightLogs: [], isNewUser: true };
+  const { supabase, user, isNewUser } = session;
+  if (isNewUser) return { weightLogs: [], isNewUser };
+
+  const { data } = await supabase
+    .from("weight_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("logged_at", { ascending: false })
+    .limit(RECENT_WEIGHT_LOGS);
+
+  return { weightLogs: (data ?? []).map(mapWeightLog).reverse(), isNewUser };
+}
+
+export type AnalyticsPageData = { trends: DailyTrend[]; achievements: Achievement[]; isNewUser: boolean };
+
+/** Lighter-weight fetch for the analytics page — trend frame plus achievements (currently placeholder). */
+export async function getAnalyticsPageData(): Promise<AnalyticsPageData> {
+  const session = await requireSession();
+  if (!session) return { trends: [], achievements: [], isNewUser: true };
+  const { supabase, user, isNewUser } = session;
+  if (isNewUser) return { trends: [], achievements: [], isNewUser };
+
+  const { data } = await supabase
+    .from("weight_logs")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("logged_at", { ascending: false })
+    .limit(RECENT_WEIGHT_LOGS);
+
+  const weightLogs = (data ?? []).map(mapWeightLog).reverse();
+  return { trends: buildTrendFrame(weightLogs), achievements: [], isNewUser };
+}
+
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   const supabase = await createClient();
   const {
