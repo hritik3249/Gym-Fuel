@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Activity, BarChart3, Droplets, Home, Moon, Plus, Scale, Search, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,14 @@ function NavLink({ href, label, icon: Icon, active, variant }: {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
+
+  // Warm every section's route segment + instant-loading skeleton up front, so tapping
+  // a tab feels immediate instead of waiting on the chunk to load on first visit.
+  useEffect(() => {
+    for (const item of NAV_ITEMS) router.prefetch(item.href);
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-background">
