@@ -59,6 +59,16 @@ function decimalsFor(key: keyof Nutrients) {
   return key === "calories" || key === "potassium" || key === "sodium" ? 0 : 1;
 }
 
+export type ServingMeasure = { amount: number; unit: "g" | "ml" };
+
+/** Pulls the base gram/millilitre amount out of a serving label, e.g. "1 bowl, 220g" → { amount: 220, unit: "g" }. */
+export function parseServingMeasure(serving: string): ServingMeasure | null {
+  const match = serving.match(/(\d+(?:\.\d+)?)\s*(ml|g)\b/i);
+  if (!match) return null;
+
+  return { amount: Number(match[1]), unit: match[2].toLowerCase() as ServingMeasure["unit"] };
+}
+
 export function foodToEntry(food: Food, meal: FoodEntry["meal"], quantity = 1): FoodEntry {
   const scaled = NUTRIENT_KEYS.reduce((acc, key) => {
     acc[key] = Number((food[key] * quantity).toFixed(decimalsFor(key)));

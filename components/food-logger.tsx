@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { foodToEntry, sumEntries } from "@/lib/nutrition";
+import { foodToEntry, parseServingMeasure, sumEntries } from "@/lib/nutrition";
+import type { ServingMeasure } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
 import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchExternalFoods } from "@/lib/actions/food";
@@ -67,6 +68,8 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [externalFoods, setExternalFoods] = useState<Food[]>([]);
   const [searchingExternal, setSearchingExternal] = useState(false);
+  const [loggingFood, setLoggingFood] = useState<{ food: Food; measure: ServingMeasure } | null>(null);
+  const [amountInput, setAmountInput] = useState("");
 
   const filteredFoods = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -104,6 +107,33 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
     startTransition(async () => {
       await logFoodEntry({ ...entry, foodId: food.id });
     });
+  }
+
+  /** Most foods state their base serving in grams or millilitres — ask how much was actually had so totals scale correctly. */
+  function startLogFood(food: Food) {
+    const measure = parseServingMeasure(food.serving);
+    if (!measure) {
+      handleLogFood(food);
+      return;
+    }
+
+    setLoggingFood({ food, measure });
+    setAmountInput(String(measure.amount));
+  }
+
+  function confirmLogFood() {
+    if (!loggingFood) return;
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    handleLogFood(loggingFood.food, amount / loggingFood.measure.amount);
+    setLoggingFood(null);
+    setAmountInput("");
+  }
+
+  function cancelLogFood() {
+    setLoggingFood(null);
+    setAmountInput("");
   }
 
   function handleDuplicateEntry(entry: FoodEntry) {
@@ -227,7 +257,7 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button onClick={() => handleLogFood(food)} disabled={isPending}>
+                    <Button onClick={() => startLogFood(food)} disabled={isPending}>
                       <Plus className="size-4" />
                       Log
                     </Button>
@@ -269,7 +299,7 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
                           {food.serving} · {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fat}g
                         </p>
                       </div>
-                      <Button variant="secondary" size="sm" onClick={() => handleLogFood(food)} disabled={isPending}>
+                      <Button variant="secondary" size="sm" onClick={() => startLogFood(food)} disabled={isPending}>
                         <Plus className="size-3.5" />
                         Log
                       </Button>
@@ -383,6 +413,44 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
           </Card>
         ))}
       </section>
+
+      {loggingFood && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={cancelLogFood}>
+          <Card className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle>How much {loggingFood.food.name}?</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <p className="text-sm text-muted-foreground">
+                Base serving is {loggingFood.measure.amount}
+                {loggingFood.measure.unit} ({loggingFood.food.serving}). Enter the actual amount you had.
+              </p>
+              <div className="grid gap-2">
+                <Label htmlFor="log-amount">Amount ({loggingFood.measure.unit})</Label>
+                <Input
+                  id="log-amount"
+                  type="number"
+                  min="0"
+                  step="any"
+                  autoFocus
+                  value={amountInput}
+                  onChange={(e) => setAmountInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmLogFood()}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={cancelLogFood}>
+                  Cancel
+                </Button>
+                <Button className="flex-1" onClick={confirmLogFood} disabled={isPending}>
+                  <Plus className="size-4" />
+                  Log it
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
