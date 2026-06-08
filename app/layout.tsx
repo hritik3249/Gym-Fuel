@@ -7,7 +7,8 @@ export const metadata: Metadata = {
   title: "FuelTrack",
   description: "Nutrition, calorie, micronutrient, hydration, and weight tracking.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "FuelTrack", statusBarStyle: "black-translucent" }
+  icons: { apple: "/icon.svg" },
+  appleWebApp: { capable: true, title: "FuelTrack", statusBarStyle: "default" }
 };
 
 export const viewport: Viewport = {
