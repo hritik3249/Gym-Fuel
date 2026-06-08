@@ -4,10 +4,7 @@ import { getDashboardSnapshot } from "@/lib/queries/dashboard";
 
 export default async function DashboardPage() {
   const snapshot = await getDashboardSnapshot();
-
-  if (snapshot.isNewUser) {
-    redirect("/app/onboarding");
-  }
+  if (snapshot.isNewUser) redirect("/app/onboarding");
 
   return (
     <Dashboard

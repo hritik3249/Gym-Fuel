@@ -10,27 +10,57 @@ import { nutrientTargets, nutrientUnits } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { clampProgress, formatNumber } from "@/lib/utils";
 import { logWater } from "@/lib/actions/water";
-import type { DailyTrend, FoodEntry, Goal, Nutrients, WeightLog } from "@/lib/types";
+import type { DailyTrend, FoodEntry, Goal, MealType, Nutrients, WeightLog } from "@/lib/types";
 
-const metricTones = { calories: "emerald", protein: "sky", carbs: "amber", fat: "rose" } as const;
+const MACRO_TONES = { calories: "emerald", protein: "sky", carbs: "amber", fat: "rose" } as const;
+const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snacks"];
+const WATER_QUICK_ADD_ML = [250, 500, 750, 1000];
+const CHART_TOOLTIP_STYLE = { borderRadius: 8, border: "1px solid hsl(var(--border))" };
 
-export function Dashboard({ goals, totals, water, weight, entries, trends, weights, streak }: {
-  goals: Goal; totals: Nutrients; water: number; weight: number;
-  entries: FoodEntry[]; trends: DailyTrend[]; weights: WeightLog[]; streak: number;
-}) {
+function progressMessage(percentComplete: number) {
+  if (percentComplete === 0) return "Log your first meal to get started.";
+  if (percentComplete < 50) return "Good start — keep logging your meals.";
+  if (percentComplete < 90) return "You're on track. Keep it up!";
+  return "Almost at your goal for today!";
+}
+
+function progressTone(percent: number) {
+  if (percent < 60) return "bg-rose-500";
+  if (percent < 90) return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+function formatWaterAmount(amountMl: number) {
+  return amountMl === 1000 ? "1L" : `${amountMl}ml`;
+}
+
+export type DashboardProps = {
+  goals: Goal;
+  totals: Nutrients;
+  water: number;
+  weight: number;
+  entries: FoodEntry[];
+  trends: DailyTrend[];
+  weights: WeightLog[];
+  streak: number;
+};
+
+export function Dashboard({ goals, totals, water, weight, entries, trends, weights, streak }: DashboardProps) {
   useRealtimeRefresh(["food_entries", "water_logs", "weight_logs", "goals"]);
+
   const [waterTotal, setWaterTotal] = useState(water);
   const [isPending, startTransition] = useTransition();
 
   const macros = [
-    { key: "calories", label: "Calories", value: totals.calories, goal: goals.calories, unit: "kcal" },
-    { key: "protein", label: "Protein", value: totals.protein, goal: goals.protein, unit: "g" },
-    { key: "carbs", label: "Carbs", value: totals.carbs, goal: goals.carbs, unit: "g" },
-    { key: "fat", label: "Fat", value: totals.fat, goal: goals.fat, unit: "g" }
-  ] as const;
+    { key: "calories" as const, label: "Calories", value: totals.calories, goal: goals.calories, unit: "kcal" },
+    { key: "protein" as const, label: "Protein", value: totals.protein, goal: goals.protein, unit: "g" },
+    { key: "carbs" as const, label: "Carbs", value: totals.carbs, goal: goals.carbs, unit: "g" },
+    { key: "fat" as const, label: "Fat", value: totals.fat, goal: goals.fat, unit: "g" }
+  ];
 
-  const mealTotals = ["breakfast", "lunch", "dinner", "snacks"].map((meal) => ({
-    meal, calories: entries.filter((e) => e.meal === meal).reduce((sum, e) => sum + e.calories, 0)
+  const mealTotals = MEAL_TYPES.map((meal) => ({
+    meal,
+    calories: entries.filter((entry) => entry.meal === meal).reduce((sum, entry) => sum + entry.calories, 0)
   }));
 
   function handleAddWater(amount: number) {
@@ -40,7 +70,8 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
     });
   }
 
-  const pctComplete = goals.calories > 0 ? Math.round((totals.calories / goals.calories) * 100) : 0;
+  const percentComplete = goals.calories > 0 ? Math.round((totals.calories / goals.calories) * 100) : 0;
+  const hasTrendData = trends.some((trend) => trend.calories > 0);
 
   return (
     <div className="container grid gap-4 py-4 sm:py-6">
@@ -49,18 +80,8 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-primary">Today</p>
-              <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
-                Fuel plan is {pctComplete}% complete
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                {pctComplete === 0
-                  ? "Log your first meal to get started."
-                  : pctComplete < 50
-                  ? "Good start — keep logging your meals."
-                  : pctComplete < 90
-                  ? "You're on track. Keep it up!"
-                  : "Almost at your goal for today!"}
-              </p>
+              <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Fuel plan is {percentComplete}% complete</h2>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{progressMessage(percentComplete)}</p>
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2">
               <Flame className="size-5 text-orange-500" />
@@ -72,7 +93,7 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {macros.map((macro) => (
-              <ProgressRing key={macro.key} label={macro.label} value={macro.value} goal={macro.goal} unit={macro.unit} tone={metricTones[macro.key]} />
+              <ProgressRing key={macro.key} label={macro.label} value={macro.value} goal={macro.goal} unit={macro.unit} tone={MACRO_TONES[macro.key]} />
             ))}
           </div>
         </div>
@@ -87,14 +108,14 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
           <CardContent>
             <ProgressRing label="Hydration" value={waterTotal / 1000} goal={goals.waterMl / 1000} unit="L" tone="sky" />
             <div className="mt-4 grid grid-cols-4 gap-2">
-              {[250, 500, 750, 1000].map((amount) => (
+              {WATER_QUICK_ADD_ML.map((amount) => (
                 <button
                   key={amount}
                   onClick={() => handleAddWater(amount)}
                   disabled={isPending}
-                  className="rounded-md border border-border bg-background py-2 text-xs font-semibold hover:bg-accent disabled:opacity-50 flex items-center justify-center"
+                  className="flex items-center justify-center rounded-md border border-border bg-background py-2 text-xs font-semibold hover:bg-accent disabled:opacity-50"
                 >
-                  {isPending ? <Loader2 className="size-3 animate-spin" /> : amount === 1000 ? "1L" : `${amount}ml`}
+                  {isPending ? <Loader2 className="size-3 animate-spin" /> : formatWaterAmount(amount)}
                 </button>
               ))}
             </div>
@@ -111,21 +132,21 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
             </CardTitle>
           </CardHeader>
           <CardContent className="h-72">
-            {trends.every(t => t.calories === 0) ? (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                No trend data yet — start logging meals!
-              </div>
-            ) : (
+            {hasTrendData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trends}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                   <Area type="monotone" dataKey="calories" stroke="#10b981" fill="#10b98133" strokeWidth={2} />
                   <Area type="monotone" dataKey="protein" stroke="#0ea5e9" fill="#0ea5e933" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No trend data yet — start logging meals!
+              </div>
             )}
           </CardContent>
         </Card>
@@ -142,7 +163,7 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
               <BarChart data={mealTotals}>
                 <XAxis dataKey="meal" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 <Bar dataKey="calories" fill="#f59e0b" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -162,9 +183,7 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
             <div className="flex items-end justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Current weight</p>
-                <p className="text-4xl font-bold">
-                  {weight > 0 ? `${formatNumber(weight, 1)}kg` : "—"}
-                </p>
+                <p className="text-4xl font-bold">{weight > 0 ? `${formatNumber(weight, 1)}kg` : "—"}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Target</p>
@@ -178,10 +197,10 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weights.map((item) => ({ date: item.loggedAt.slice(5, 10), weight: item.weightKg }))}>
+                  <AreaChart data={weights.map((log) => ({ date: log.loggedAt.slice(5, 10), weight: log.weightKg }))}>
                     <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                     <YAxis domain={["dataMin - 1", "dataMax + 1"]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
+                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                     <Area type="monotone" dataKey="weight" stroke="#8b5cf6" fill="#8b5cf633" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -191,7 +210,9 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Micronutrient Coverage</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Micronutrient Coverage</CardTitle>
+          </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {(Object.keys(nutrientTargets) as Array<keyof typeof nutrientTargets>).map((key) => {
               const consumed = totals[key];
@@ -201,9 +222,12 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
                 <div key={key} className="rounded-lg border border-border bg-background p-3">
                   <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                     <span className="font-semibold">{key.replace(/([A-Z])/g, " $1")}</span>
-                    <span className="text-muted-foreground">{formatNumber(consumed, 1)} / {target}{nutrientUnits[key]}</span>
+                    <span className="text-muted-foreground">
+                      {formatNumber(consumed, 1)} / {target}
+                      {nutrientUnits[key]}
+                    </span>
                   </div>
-                  <Progress value={progress} indicatorClassName={progress < 60 ? "bg-rose-500" : progress < 90 ? "bg-amber-500" : "bg-emerald-500"} />
+                  <Progress value={progress} indicatorClassName={progressTone(progress)} />
                 </div>
               );
             })}

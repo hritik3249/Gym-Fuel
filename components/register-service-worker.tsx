@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect } from "react";
 
 export function RegisterServiceWorker() {
@@ -7,5 +8,6 @@ export function RegisterServiceWorker() {
       navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     }
   }, []);
+
   return null;
 }

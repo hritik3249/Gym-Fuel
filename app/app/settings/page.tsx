@@ -1,13 +1,28 @@
 import { redirect } from "next/navigation";
 import { SettingsView } from "@/components/settings-view";
+import type { SettingsProfile } from "@/components/settings-view";
 import { createClient } from "@/lib/supabase/server";
 import { defaultGoals } from "@/lib/nutrition";
 import type { Goal } from "@/lib/types";
 import type { ActivityLevel, FitnessGoal, Gender } from "@/lib/calculator";
 
+function mapGoals(row: Record<string, unknown> | null): Goal {
+  if (!row) return defaultGoals;
+  return {
+    calories: Number(row.calories),
+    protein: Number(row.protein),
+    carbs: Number(row.carbs),
+    fat: Number(row.fat),
+    waterMl: Number(row.water_ml),
+    targetWeightKg: Number(row.target_weight_kg)
+  };
+}
+
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
   const [{ data: goalsData }, { data: profileData }] = await Promise.all([
@@ -15,24 +30,15 @@ export default async function SettingsPage() {
     supabase.from("profiles").select("*").eq("id", user.id).single()
   ]);
 
-  const goals: Goal = goalsData ? {
-    calories: goalsData.calories,
-    protein: Number(goalsData.protein),
-    carbs: Number(goalsData.carbs),
-    fat: Number(goalsData.fat),
-    waterMl: goalsData.water_ml,
-    targetWeightKg: Number(goalsData.target_weight_kg)
-  } : defaultGoals;
-
-  const profile = {
+  const profile: SettingsProfile = {
     displayName: profileData?.display_name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "",
-    age: profileData?.age ?? ("" as const),
+    age: profileData?.age ?? "",
     gender: (profileData?.gender ?? "male") as Gender,
-    heightCm: profileData?.height_cm ?? ("" as const),
-    weightKg: profileData?.current_weight_kg ?? ("" as const),
+    heightCm: profileData?.height_cm ?? "",
+    weightKg: profileData?.current_weight_kg ?? "",
     activityLevel: (profileData?.activity_level ?? "moderate") as ActivityLevel,
     fitnessGoal: (profileData?.fitness_goal ?? "maintain") as FitnessGoal
   };
 
-  return <SettingsView goals={goals} profile={profile} />;
+  return <SettingsView goals={mapGoals(goalsData)} profile={profile} />;
 }

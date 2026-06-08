@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveProfile } from "@/lib/actions/profile";
 import { calculateGoals } from "@/lib/calculator";
-import type { ActivityLevel, FitnessGoal, Gender } from "@/lib/calculator";
+import type { ActivityLevel, CalculatedGoals, FitnessGoal, Gender } from "@/lib/calculator";
 
-const activityOptions: { value: ActivityLevel; label: string; detail: string }[] = [
+const ACTIVITY_OPTIONS: Array<{ value: ActivityLevel; label: string; detail: string }> = [
   { value: "sedentary", label: "Sedentary", detail: "Little or no exercise" },
   { value: "light", label: "Light", detail: "1–3 days/week" },
   { value: "moderate", label: "Moderate", detail: "3–5 days/week" },
@@ -18,11 +18,41 @@ const activityOptions: { value: ActivityLevel; label: string; detail: string }[]
   { value: "very_active", label: "Very Active", detail: "Hard training daily" }
 ];
 
-const goalOptions: { value: FitnessGoal; label: string; detail: string; emoji: string }[] = [
+const GOAL_OPTIONS: Array<{ value: FitnessGoal; label: string; detail: string; emoji: string }> = [
   { value: "lose", label: "Lose weight", detail: "500 kcal deficit", emoji: "🔥" },
   { value: "maintain", label: "Maintain", detail: "Eat at TDEE", emoji: "⚖️" },
   { value: "gain", label: "Gain muscle", detail: "300 kcal surplus", emoji: "💪" }
 ];
+
+const PREVIEW_MACROS = (preview: CalculatedGoals) => [
+  { label: "Calories", value: `${preview.calories} kcal` },
+  { label: "Protein", value: `${preview.protein}g` },
+  { label: "Carbs", value: `${preview.carbs}g` },
+  { label: "Fat", value: `${preview.fat}g` }
+];
+
+function ToggleGroup<T extends string>({ options, value, onChange }: {
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={`rounded-md border py-2.5 text-sm font-semibold capitalize transition-colors ${
+            value === option.value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-accent"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function OnboardingForm() {
   const [loading, setLoading] = useState(false);
@@ -30,10 +60,9 @@ export function OnboardingForm() {
   const [gender, setGender] = useState<Gender>("male");
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>("moderate");
   const [fitnessGoal, setFitnessGoal] = useState<FitnessGoal>("maintain");
-  const [preview, setPreview] = useState<ReturnType<typeof calculateGoals> | null>(null);
+  const [preview, setPreview] = useState<CalculatedGoals | null>(null);
 
-  // Live preview of calculated goals
-  function updatePreview(form: HTMLFormElement) {
+  function refreshPreview(form: HTMLFormElement) {
     const data = new FormData(form);
     const age = Number(data.get("age"));
     const heightCm = Number(data.get("heightCm"));
@@ -43,12 +72,12 @@ export function OnboardingForm() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setLoading(true);
     setError("");
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(event.currentTarget);
     formData.set("gender", gender);
     formData.set("activityLevel", activityLevel);
     formData.set("fitnessGoal", fitnessGoal);
@@ -67,18 +96,17 @@ export function OnboardingForm() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-2xl">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4">
+          <span className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
             <Activity className="size-7" />
           </span>
           <h1 className="text-3xl font-bold">Welcome to FuelTrack</h1>
           <p className="mt-2 text-muted-foreground">Tell us about yourself and we&apos;ll calculate your optimal goals.</p>
         </div>
 
-        <form onSubmit={handleSubmit} onChange={(e) => updatePreview(e.currentTarget)} className="grid gap-6">
-          {/* Basic Info */}
+        <form onSubmit={handleSubmit} onChange={(e) => refreshPreview(e.currentTarget)} className="grid gap-6">
           <Card>
-            <CardContent className="pt-6 grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 grid gap-2">
+            <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
+              <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="displayName">Your name</Label>
                 <Input id="displayName" name="displayName" placeholder="e.g. Hritik" />
               </div>
@@ -88,22 +116,7 @@ export function OnboardingForm() {
               </div>
               <div className="grid gap-2">
                 <Label>Gender</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["male", "female"] as Gender[]).map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGender(g)}
-                      className={`rounded-md border py-2.5 text-sm font-semibold capitalize transition-colors ${
-                        gender === g
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background hover:bg-accent"
-                      }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
+                <ToggleGroup options={[{ value: "male", label: "male" }, { value: "female", label: "female" }]} value={gender} onChange={setGender} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="heightCm">Height (cm)</Label>
@@ -116,70 +129,58 @@ export function OnboardingForm() {
             </CardContent>
           </Card>
 
-          {/* Activity Level */}
           <Card>
-            <CardContent className="pt-6 grid gap-3">
+            <CardContent className="grid gap-3 pt-6">
               <Label>Activity level</Label>
               <div className="grid gap-2 sm:grid-cols-5">
-                {activityOptions.map((opt) => (
+                {ACTIVITY_OPTIONS.map((option) => (
                   <button
-                    key={opt.value}
+                    key={option.value}
                     type="button"
-                    onClick={() => setActivityLevel(opt.value)}
+                    onClick={() => setActivityLevel(option.value)}
                     className={`rounded-lg border p-3 text-left transition-colors ${
-                      activityLevel === opt.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-background hover:bg-accent"
+                      activityLevel === option.value ? "border-primary bg-primary/10 text-primary" : "border-border bg-background hover:bg-accent"
                     }`}
                   >
-                    <p className="text-sm font-semibold">{opt.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{opt.detail}</p>
+                    <p className="text-sm font-semibold">{option.label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{option.detail}</p>
                   </button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Fitness Goal */}
           <Card>
-            <CardContent className="pt-6 grid gap-3">
+            <CardContent className="grid gap-3 pt-6">
               <Label>Your goal</Label>
               <div className="grid gap-2 sm:grid-cols-3">
-                {goalOptions.map((opt) => (
+                {GOAL_OPTIONS.map((option) => (
                   <button
-                    key={opt.value}
+                    key={option.value}
                     type="button"
-                    onClick={() => setFitnessGoal(opt.value)}
+                    onClick={() => setFitnessGoal(option.value)}
                     className={`rounded-lg border p-4 text-left transition-colors ${
-                      fitnessGoal === opt.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-background hover:bg-accent"
+                      fitnessGoal === option.value ? "border-primary bg-primary/10 text-primary" : "border-border bg-background hover:bg-accent"
                     }`}
                   >
-                    <p className="text-xl mb-1">{opt.emoji}</p>
-                    <p className="text-sm font-semibold">{opt.label}</p>
-                    <p className="text-xs text-muted-foreground">{opt.detail}</p>
+                    <p className="mb-1 text-xl">{option.emoji}</p>
+                    <p className="text-sm font-semibold">{option.label}</p>
+                    <p className="text-xs text-muted-foreground">{option.detail}</p>
                   </button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Live Preview */}
           {preview && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="pt-6">
-                <p className="text-sm font-semibold text-primary mb-3">Your calculated daily goals</p>
+                <p className="mb-3 text-sm font-semibold text-primary">Your calculated daily goals</p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {[
-                    { label: "Calories", value: `${preview.calories} kcal` },
-                    { label: "Protein", value: `${preview.protein}g` },
-                    { label: "Carbs", value: `${preview.carbs}g` },
-                    { label: "Fat", value: `${preview.fat}g` }
-                  ].map(({ label, value }) => (
-                    <div key={label} className="rounded-lg bg-background border border-border p-3 text-center">
+                  {PREVIEW_MACROS(preview).map(({ label, value }) => (
+                    <div key={label} className="rounded-lg border border-border bg-background p-3 text-center">
                       <p className="text-xs text-muted-foreground">{label}</p>
-                      <p className="text-lg font-bold mt-0.5">{value}</p>
+                      <p className="mt-0.5 text-lg font-bold">{value}</p>
                     </div>
                   ))}
                 </div>
@@ -190,19 +191,15 @@ export function OnboardingForm() {
             </Card>
           )}
 
-          {error && (
-            <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
 
-          <Button className="w-full h-12 text-base" disabled={loading}>
+          <Button className="h-12 w-full text-base" disabled={loading}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : <ChevronRight className="size-4" />}
             Calculate my goals & start tracking
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          You can update all of this anytime in Settings.
-        </p>
+        <p className="mt-4 text-center text-xs text-muted-foreground">You can update all of this anytime in Settings.</p>
       </div>
     </div>
   );

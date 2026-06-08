@@ -2,7 +2,7 @@ export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "ver
 export type FitnessGoal = "lose" | "maintain" | "gain";
 export type Gender = "male" | "female";
 
-const activityMultipliers: Record<ActivityLevel, number> = {
+const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
   light: 1.375,
   moderate: 1.55,
@@ -10,56 +10,70 @@ const activityMultipliers: Record<ActivityLevel, number> = {
   very_active: 1.9
 };
 
-export function calculateGoals(params: {
+const CALORIE_ADJUSTMENT: Record<FitnessGoal, number> = {
+  lose: -500,
+  maintain: 0,
+  gain: 300
+};
+
+const MIN_CALORIES = 1200;
+const PROTEIN_PER_KG: Record<FitnessGoal, number> = { lose: 2.2, maintain: 2.0, gain: 2.0 };
+const FAT_SHARE_OF_CALORIES = 0.25;
+const WATER_ML_PER_KG = 35;
+const WATER_ROUNDING_ML = 250;
+
+export type CalculatorInput = {
   age: number;
   gender: Gender;
   heightCm: number;
   weightKg: number;
   activityLevel: ActivityLevel;
   goal: FitnessGoal;
-}) {
-  const { age, gender, heightCm, weightKg, activityLevel, goal } = params;
+};
 
-  // Mifflin-St Jeor BMR
-  const bmr =
-    gender === "male"
-      ? 10 * weightKg + 6.25 * heightCm - 5 * age + 5
-      : 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+export type CalculatedGoals = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  waterMl: number;
+  targetWeightKg: number;
+  tdee: number;
+  bmr: number;
+};
 
-  const tdee = Math.round(bmr * activityMultipliers[activityLevel]);
+/** Mifflin-St Jeor resting metabolic rate. */
+function basalMetabolicRate({ gender, weightKg, heightCm, age }: CalculatorInput) {
+  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
+  return gender === "male" ? base + 5 : base - 161;
+}
 
-  // Adjust calories based on goal
-  const calorieAdjust = goal === "lose" ? -500 : goal === "gain" ? 300 : 0;
-  const calories = Math.max(1200, tdee + calorieAdjust);
+function targetWeight(weightKg: number, goal: FitnessGoal) {
+  if (goal === "lose") return Math.round(weightKg * 0.9 * 2) / 2;
+  if (goal === "gain") return Math.round(weightKg * 1.05 * 2) / 2;
+  return weightKg;
+}
 
-  // Macro split
-  // Protein: 2g per kg bodyweight for gain/maintain, 2.2g for lose
-  const proteinPerKg = goal === "lose" ? 2.2 : 2.0;
-  const protein = Math.round(weightKg * proteinPerKg);
+export function calculateGoals(input: CalculatorInput): CalculatedGoals {
+  const { weightKg, activityLevel, goal } = input;
 
-  // Fat: 25% of calories
-  const fat = Math.round((calories * 0.25) / 9);
+  const bmr = basalMetabolicRate(input);
+  const tdee = Math.round(bmr * ACTIVITY_MULTIPLIERS[activityLevel]);
+  const calories = Math.max(MIN_CALORIES, tdee + CALORIE_ADJUSTMENT[goal]);
 
-  // Carbs: remaining calories
-  const proteinCals = protein * 4;
-  const fatCals = fat * 9;
-  const carbs = Math.round((calories - proteinCals - fatCals) / 4);
+  const protein = Math.round(weightKg * PROTEIN_PER_KG[goal]);
+  const fat = Math.round((calories * FAT_SHARE_OF_CALORIES) / 9);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
-  // Water: 35ml per kg
-  const waterMl = Math.round(weightKg * 35 / 250) * 250;
+  const waterMl = Math.round((weightKg * WATER_ML_PER_KG) / WATER_ROUNDING_ML) * WATER_ROUNDING_ML;
 
   return {
     calories,
     protein,
-    carbs: Math.max(0, carbs),
+    carbs,
     fat,
     waterMl,
-    targetWeightKg:
-      goal === "lose"
-        ? Math.round(weightKg * 0.9 * 2) / 2
-        : goal === "gain"
-        ? Math.round(weightKg * 1.05 * 2) / 2
-        : weightKg,
+    targetWeightKg: targetWeight(weightKg, goal),
     tdee,
     bmr: Math.round(bmr)
   };

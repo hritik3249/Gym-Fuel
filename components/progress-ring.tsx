@@ -1,17 +1,46 @@
 import { cn, formatNumber } from "@/lib/utils";
 
-export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: { value: number; goal: number; label: string; unit: string; tone?: "emerald" | "sky" | "amber" | "rose" | "violet"; }) {
+const RADIUS = 42;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+const RING_COLORS = {
+  emerald: "stroke-emerald-500",
+  sky: "stroke-sky-500",
+  amber: "stroke-amber-500",
+  rose: "stroke-rose-500",
+  violet: "stroke-violet-500"
+} as const;
+
+export type ProgressRingTone = keyof typeof RING_COLORS;
+
+export type ProgressRingProps = {
+  value: number;
+  goal: number;
+  label: string;
+  unit: string;
+  tone?: ProgressRingTone;
+};
+
+export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: ProgressRingProps) {
   const percent = goal ? Math.min(value / goal, 1) : 0;
-  const circumference = 2 * Math.PI * 42;
-  const offset = circumference - percent * circumference;
-  const colorClass = { emerald: "stroke-emerald-500", sky: "stroke-sky-500", amber: "stroke-amber-500", rose: "stroke-rose-500", violet: "stroke-violet-500" }[tone];
+  const offset = CIRCUMFERENCE - percent * CIRCUMFERENCE;
 
   return (
     <div className="flex items-center gap-3">
       <div className="relative size-24 shrink-0">
         <svg className="-rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="42" className="stroke-muted" strokeWidth="10" fill="none" />
-          <circle cx="50" cy="50" r="42" className={cn("transition-all", colorClass)} strokeWidth="10" fill="none" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} />
+          <circle cx="50" cy="50" r={RADIUS} className="stroke-muted" strokeWidth="10" fill="none" />
+          <circle
+            cx="50"
+            cy="50"
+            r={RADIUS}
+            className={cn("transition-all", RING_COLORS[tone])}
+            strokeWidth="10"
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={offset}
+          />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-lg font-bold">{Math.round(percent * 100)}%</span>

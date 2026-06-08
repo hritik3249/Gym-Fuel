@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 
+/** Browser Supabase client — for use in client components (auth forms, realtime subscriptions). */
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co";
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder-anon-key";
-  return createBrowserClient(url, key);
+  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }

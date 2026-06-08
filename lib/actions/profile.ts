@@ -7,7 +7,9 @@ import type { ActivityLevel, FitnessGoal, Gender } from "@/lib/calculator";
 
 export async function saveProfile(formData: FormData) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
   const age = Number(formData.get("age"));
@@ -16,54 +18,45 @@ export async function saveProfile(formData: FormData) {
   const weightKg = Number(formData.get("weightKg"));
   const activityLevel = formData.get("activityLevel") as ActivityLevel;
   const fitnessGoal = formData.get("fitnessGoal") as FitnessGoal;
-  const displayName = formData.get("displayName") as string;
+  const displayName = (formData.get("displayName") as string | null)?.trim() || null;
 
-  // Validate
   if (!age || !gender || !heightCm || !weightKg || !activityLevel || !fitnessGoal) {
     return { error: "All fields are required." };
   }
 
-  // Calculate goals
   const calculated = calculateGoals({ age, gender, heightCm, weightKg, activityLevel, goal: fitnessGoal });
+  const updatedAt = new Date().toISOString();
 
-  // Save profile
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
-      display_name: displayName || null,
+      display_name: displayName,
       age,
       gender,
       height_cm: heightCm,
       current_weight_kg: weightKg,
       activity_level: activityLevel,
       fitness_goal: fitnessGoal,
-      updated_at: new Date().toISOString()
+      updated_at: updatedAt
     })
     .eq("id", user.id);
 
   if (profileError) return { error: profileError.message };
 
-  // Save calculated goals
-  const { error: goalsError } = await supabase
-    .from("goals")
-    .upsert({
-      user_id: user.id,
-      calories: calculated.calories,
-      protein: calculated.protein,
-      carbs: calculated.carbs,
-      fat: calculated.fat,
-      water_ml: calculated.waterMl,
-      target_weight_kg: calculated.targetWeightKg,
-      updated_at: new Date().toISOString()
-    });
+  const { error: goalsError } = await supabase.from("goals").upsert({
+    user_id: user.id,
+    calories: calculated.calories,
+    protein: calculated.protein,
+    carbs: calculated.carbs,
+    fat: calculated.fat,
+    water_ml: calculated.waterMl,
+    target_weight_kg: calculated.targetWeightKg,
+    updated_at: updatedAt
+  });
 
   if (goalsError) return { error: goalsError.message };
 
-  // Also log current weight
-  await supabase.from("weight_logs").insert({
-    user_id: user.id,
-    weight_kg: weightKg
-  });
+  await supabase.from("weight_logs").insert({ user_id: user.id, weight_kg: weightKg });
 
   revalidatePath("/app/dashboard");
   revalidatePath("/app/settings");

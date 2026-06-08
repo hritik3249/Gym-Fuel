@@ -10,28 +10,55 @@ import { foodToEntry, sumEntries } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
 import { logFoodEntry, deleteFoodEntry, saveCustomFood } from "@/lib/actions/food";
-import type { Food, FoodEntry, MealType } from "@/lib/types";
+import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
 
-const meals: Array<{ id: MealType; label: string }> = [
+const MEALS: Array<{ id: MealType; label: string }> = [
   { id: "breakfast", label: "Breakfast" },
   { id: "lunch", label: "Lunch" },
   { id: "dinner", label: "Dinner" },
   { id: "snacks", label: "Snacks" }
 ];
 
-const blankCustomFood: Omit<Food, "id" | "source"> = {
-  name: "", serving: "1 serving", calories: 0, protein: 0, carbs: 0, fat: 0,
-  fiber: 0, iron: 0, calcium: 0, magnesium: 0, zinc: 0, potassium: 0,
-  sodium: 0, vitaminD: 0, vitaminB12: 0
+const CUSTOM_FOOD_NUMBER_FIELDS = ["calories", "protein", "carbs", "fat", "fiber", "iron"] as const satisfies readonly (keyof Nutrients)[];
+
+const BLANK_CUSTOM_FOOD: Omit<Food, "id" | "source"> = {
+  name: "",
+  serving: "1 serving",
+  calories: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fiber: 0,
+  iron: 0,
+  calcium: 0,
+  magnesium: 0,
+  zinc: 0,
+  potassium: 0,
+  sodium: 0,
+  vitaminD: 0,
+  vitaminB12: 0
 };
 
-export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEntries: FoodEntry[]; }) {
+const RECENT_ENTRIES_SHOWN = 4;
+const FREQUENT_FOODS_SHOWN = 5;
+
+function matchesSearch(food: Food, term: string) {
+  if (!term) return true;
+  return [food.name, food.brand, food.cuisine, food.source].filter(Boolean).join(" ").toLowerCase().includes(term);
+}
+
+export type FoodLoggerProps = {
+  foods: Food[];
+  initialEntries: FoodEntry[];
+};
+
+export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
   useRealtimeRefresh(["foods", "saved_foods", "food_entries"]);
 
   const [query, setQuery] = useState("");
   const [selectedMeal, setSelectedMeal] = useState<MealType>("lunch");
   const [entries, setEntries] = useState(initialEntries);
-  const [customFood, setCustomFood] = useState(blankCustomFood);
+  const [customFood, setCustomFood] = useState(BLANK_CUSTOM_FOOD);
   const [savedFoods, setSavedFoods] = useState(foods);
   const [isPending, startTransition] = useTransition();
   const [savingCustom, setSavingCustom] = useState(false);
@@ -39,33 +66,28 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
 
   const filteredFoods = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return savedFoods;
-    return savedFoods.filter((food) =>
-      [food.name, food.brand, food.cuisine, food.source]
-        .filter(Boolean).join(" ").toLowerCase().includes(term)
-    );
+    return savedFoods.filter((food) => matchesSearch(food, term));
   }, [query, savedFoods]);
 
   function handleLogFood(food: Food, quantity = 1) {
     const entry = foodToEntry(food, selectedMeal, quantity);
-    // Optimistic update
-    setEntries((c) => [entry, ...c]);
+    setEntries((current) => [entry, ...current]);
     startTransition(async () => {
       await logFoodEntry({ ...entry, foodId: food.id });
     });
   }
 
   function handleDuplicateEntry(entry: FoodEntry) {
-    const newEntry = { ...entry, id: crypto.randomUUID(), loggedAt: new Date().toISOString() };
-    setEntries((c) => [newEntry, ...c]);
+    const duplicate: FoodEntry = { ...entry, id: crypto.randomUUID(), loggedAt: new Date().toISOString() };
+    setEntries((current) => [duplicate, ...current]);
     startTransition(async () => {
-      await logFoodEntry(newEntry);
+      await logFoodEntry(duplicate);
     });
   }
 
   async function handleDeleteEntry(id: string) {
     setDeletingId(id);
-    setEntries((c) => c.filter((i) => i.id !== id));
+    setEntries((current) => current.filter((entry) => entry.id !== id));
     await deleteFoodEntry(id);
     setDeletingId(null);
   }
@@ -80,27 +102,25 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
       return;
     }
 
-    // Use returned food id or generate temp
-    const food: Food = {
-      ...customFood,
-      id: result.food?.id ?? crypto.randomUUID(),
-      source: "custom",
-      favorite: true
-    };
+    const food: Food = { ...customFood, id: result.food?.id ?? crypto.randomUUID(), source: "custom", favorite: true };
 
-    setSavedFoods((c) => [food, ...c]);
+    setSavedFoods((current) => [food, ...current]);
     handleLogFood(food);
-    setCustomFood(blankCustomFood);
+    setCustomFood(BLANK_CUSTOM_FOOD);
     setSavingCustom(false);
   }
 
-  const mealGroups = meals.map((meal) => {
-    const mealEntries = entries.filter((e) => e.meal === meal.id);
+  function updateCustomFoodField<K extends keyof typeof customFood>(field: K, value: (typeof customFood)[K]) {
+    setCustomFood((current) => ({ ...current, [field]: value }));
+  }
+
+  const mealGroups = MEALS.map((meal) => {
+    const mealEntries = entries.filter((entry) => entry.meal === meal.id);
     return { ...meal, entries: mealEntries, totals: sumEntries(mealEntries) };
   });
 
-  const recent = entries.slice(0, 4);
-  const frequent = savedFoods.filter((f) => f.favorite).slice(0, 5);
+  const recentEntries = entries.slice(0, RECENT_ENTRIES_SHOWN);
+  const frequentFoods = savedFoods.filter((food) => food.favorite).slice(0, FREQUENT_FOODS_SHOWN);
 
   return (
     <div className="container grid gap-4 py-4 sm:py-6">
@@ -112,22 +132,15 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search paneer, dal, rice, chicken..."
-                  className="pl-9"
-                />
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search paneer, dal, rice, chicken..." className="pl-9" />
               </div>
               <div className="grid grid-cols-4 gap-1 rounded-md border border-border bg-background p-1">
-                {meals.map((meal) => (
+                {MEALS.map((meal) => (
                   <button
                     key={meal.id}
                     onClick={() => setSelectedMeal(meal.id)}
                     className={`rounded px-2 py-2 text-xs font-semibold transition-colors ${
-                      selectedMeal === meal.id
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                      selectedMeal === meal.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {meal.label.split(" ")[0]}
@@ -137,7 +150,7 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
             </div>
           </div>
 
-          {frequent.length > 0 && (
+          {frequentFoods.length > 0 && (
             <Card className="bg-background/75">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-sm">
@@ -146,7 +159,7 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                {frequent.map((food) => (
+                {frequentFoods.map((food) => (
                   <Button key={food.id} variant="secondary" size="sm" onClick={() => handleLogFood(food)} disabled={isPending}>
                     <Plus className="size-3.5" />
                     {food.name}
@@ -160,7 +173,9 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
 
       <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
         <Card>
-          <CardHeader><CardTitle>Food Database</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Food Database</CardTitle>
+          </CardHeader>
           <CardContent className="grid gap-3">
             {filteredFoods.length === 0 ? (
               <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -173,9 +188,7 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold">{food.name}</p>
                       {food.favorite && <Heart className="size-4 fill-rose-500 text-rose-500" />}
-                      <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                        {food.source.replaceAll("_", " ")}
-                      </span>
+                      <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">{food.source.replaceAll("_", " ")}</span>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {food.serving} · {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fat}g
@@ -198,28 +211,20 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
 
         <div className="grid gap-4">
           <Card>
-            <CardHeader><CardTitle>Create Custom Food</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Create Custom Food</CardTitle>
+            </CardHeader>
             <CardContent className="grid gap-3">
               <div className="grid gap-2">
                 <Label htmlFor="food-name">Food name</Label>
-                <Input
-                  id="food-name"
-                  value={customFood.name}
-                  onChange={(e) => setCustomFood((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Homemade Dal"
-                />
+                <Input id="food-name" value={customFood.name} onChange={(e) => updateCustomFoodField("name", e.target.value)} placeholder="e.g. Homemade Dal" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="serving">Serving size</Label>
-                <Input
-                  id="serving"
-                  value={customFood.serving}
-                  onChange={(e) => setCustomFood((f) => ({ ...f, serving: e.target.value }))}
-                  placeholder="1 bowl, 180g"
-                />
+                <Input id="serving" value={customFood.serving} onChange={(e) => updateCustomFoodField("serving", e.target.value)} placeholder="1 bowl, 180g" />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {(["calories", "protein", "carbs", "fat", "fiber", "iron"] as const).map((field) => (
+                {CUSTOM_FOOD_NUMBER_FIELDS.map((field) => (
                   <div key={field} className="grid gap-2">
                     <Label htmlFor={field}>{field}</Label>
                     <Input
@@ -227,7 +232,7 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
                       inputMode="decimal"
                       value={customFood[field] || ""}
                       placeholder="0"
-                      onChange={(e) => setCustomFood((f) => ({ ...f, [field]: Number(e.target.value || 0) }))}
+                      onChange={(e) => updateCustomFoodField(field, Number(e.target.value || 0))}
                     />
                   </div>
                 ))}
@@ -239,11 +244,13 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
             </CardContent>
           </Card>
 
-          {recent.length > 0 && (
+          {recentEntries.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Recent Foods</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Recent Foods</CardTitle>
+              </CardHeader>
               <CardContent className="grid gap-2">
-                {recent.map((entry) => (
+                {recentEntries.map((entry) => (
                   <button
                     key={entry.id}
                     onClick={() => handleDuplicateEntry(entry)}
@@ -252,7 +259,9 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
                   >
                     <span>
                       <span className="block text-sm font-semibold">{entry.foodName}</span>
-                      <span className="block text-xs text-muted-foreground">{entry.meal} · {entry.calories} kcal</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {entry.meal} · {entry.calories} kcal
+                      </span>
                     </span>
                     <Copy className="size-4 text-muted-foreground" />
                   </button>
@@ -279,9 +288,7 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
             </CardHeader>
             <CardContent className="grid gap-2">
               {group.entries.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  No foods logged yet.
-                </p>
+                <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">No foods logged yet.</p>
               ) : (
                 group.entries.map((entry) => (
                   <div key={entry.id} className="flex flex-col gap-3 rounded-md border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -295,17 +302,8 @@ export function FoodLogger({ foods, initialEntries }: { foods: Food[]; initialEn
                       <Button variant="outline" size="icon" onClick={() => handleDuplicateEntry(entry)} disabled={isPending} aria-label="Duplicate entry">
                         <Copy className="size-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        disabled={deletingId === entry.id}
-                        aria-label="Delete entry"
-                      >
-                        {deletingId === entry.id
-                          ? <Loader2 className="size-4 animate-spin" />
-                          : <Trash2 className="size-4" />
-                        }
+                      <Button variant="outline" size="icon" onClick={() => handleDeleteEntry(entry.id)} disabled={deletingId === entry.id} aria-label="Delete entry">
+                        {deletingId === entry.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
                       </Button>
                     </div>
                   </div>

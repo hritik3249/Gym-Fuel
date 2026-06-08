@@ -11,10 +11,10 @@ import { saveProfile } from "@/lib/actions/profile";
 import { saveGoals } from "@/lib/actions/goals";
 import { createClient } from "@/lib/supabase/browser";
 import { calculateGoals } from "@/lib/calculator";
-import type { ActivityLevel, FitnessGoal, Gender } from "@/lib/calculator";
+import type { ActivityLevel, CalculatedGoals, FitnessGoal, Gender } from "@/lib/calculator";
 import type { Goal } from "@/lib/types";
 
-const activityOptions: { value: ActivityLevel; label: string }[] = [
+const ACTIVITY_OPTIONS: Array<{ value: ActivityLevel; label: string }> = [
   { value: "sedentary", label: "Sedentary" },
   { value: "light", label: "Light (1–3x/week)" },
   { value: "moderate", label: "Moderate (3–5x/week)" },
@@ -22,13 +22,27 @@ const activityOptions: { value: ActivityLevel; label: string }[] = [
   { value: "very_active", label: "Very Active (daily)" }
 ];
 
-const goalOptions: { value: FitnessGoal; label: string }[] = [
+const GOAL_OPTIONS: Array<{ value: FitnessGoal; label: string }> = [
   { value: "lose", label: "🔥 Lose weight" },
   { value: "maintain", label: "⚖️ Maintain" },
   { value: "gain", label: "💪 Gain muscle" }
 ];
 
-type Profile = {
+const GOAL_FIELDS = [
+  ["calories", "Calories", "kcal"],
+  ["protein", "Protein", "g"],
+  ["carbs", "Carbs", "g"],
+  ["fat", "Fat", "g"],
+  ["waterMl", "Water", "ml"],
+  ["targetWeightKg", "Target weight", "kg"]
+] as const satisfies ReadonlyArray<readonly [keyof Goal, string, string]>;
+
+const REMINDER_ITEMS = ["Breakfast log reminder", "Evening hydration check", "Weekly report summary"];
+
+const SELECT_CLASSES =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+export type SettingsProfile = {
   displayName: string;
   age: number | "";
   gender: Gender;
@@ -38,16 +52,22 @@ type Profile = {
   fitnessGoal: FitnessGoal;
 };
 
-export function SettingsView({
-  goals: initialGoals,
-  profile: initialProfile
-}: {
-  goals: Goal;
-  profile: Profile;
-}) {
+function applyCalculatedGoals(goals: Goal, calculated: CalculatedGoals): Goal {
+  return {
+    ...goals,
+    calories: calculated.calories,
+    protein: calculated.protein,
+    carbs: calculated.carbs,
+    fat: calculated.fat,
+    waterMl: calculated.waterMl,
+    targetWeightKg: calculated.targetWeightKg
+  };
+}
+
+export function SettingsView({ goals: initialGoals, profile: initialProfile }: { goals: Goal; profile: SettingsProfile }) {
   const [goals, setGoals] = useState<Goal>(initialGoals);
-  const [profile, setProfile] = useState<Profile>(initialProfile);
-  const [preview, setPreview] = useState<ReturnType<typeof calculateGoals> | null>(null);
+  const [profile, setProfile] = useState<SettingsProfile>(initialProfile);
+  const [preview, setPreview] = useState<CalculatedGoals | null>(null);
   const [profilePending, startProfileTransition] = useTransition();
   const [goalsPending, startGoalsTransition] = useTransition();
   const [profileSaved, setProfileSaved] = useState(false);
@@ -55,50 +75,47 @@ export function SettingsView({
   const [profileError, setProfileError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
 
+  function updateProfile<K extends keyof SettingsProfile>(field: K, value: SettingsProfile[K]) {
+    setProfile((current) => ({ ...current, [field]: value }));
+  }
+
   function recalculate() {
     const age = Number(profile.age);
     const heightCm = Number(profile.heightCm);
     const weightKg = Number(profile.weightKg);
-    if (age > 0 && heightCm > 0 && weightKg > 0) {
-      const calc = calculateGoals({
-        age, gender: profile.gender, heightCm, weightKg,
-        activityLevel: profile.activityLevel, goal: profile.fitnessGoal
-      });
-      setPreview(calc);
-      setGoals((g) => ({
-        ...g,
-        calories: calc.calories,
-        protein: calc.protein,
-        carbs: calc.carbs,
-        fat: calc.fat,
-        waterMl: calc.waterMl,
-        targetWeightKg: calc.targetWeightKg
-      }));
-    }
+    if (age <= 0 || heightCm <= 0 || weightKg <= 0) return;
+
+    const calculated = calculateGoals({ age, gender: profile.gender, heightCm, weightKg, activityLevel: profile.activityLevel, goal: profile.fitnessGoal });
+    setPreview(calculated);
+    setGoals((current) => applyCalculatedGoals(current, calculated));
   }
 
-  function handleSaveProfile(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function handleSaveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setProfileSaved(false);
     setProfileError("");
-    const formData = new FormData(e.currentTarget);
+
+    const formData = new FormData(event.currentTarget);
     formData.set("gender", profile.gender);
     formData.set("activityLevel", profile.activityLevel);
     formData.set("fitnessGoal", profile.fitnessGoal);
+
     startProfileTransition(async () => {
       const result = await saveProfile(formData);
-      if (result?.error) { setProfileError(result.error); return; }
-      if (result?.calculated) {
-        setGoals((g) => ({ ...g, ...result.calculated }));
+      if (result?.error) {
+        setProfileError(result.error);
+        return;
       }
+      if (result?.calculated) setGoals((current) => applyCalculatedGoals(current, result.calculated));
       setProfileSaved(true);
     });
   }
 
-  function handleSaveGoals(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function handleSaveGoals(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setGoalsSaved(false);
-    const formData = new FormData(e.currentTarget);
+
+    const formData = new FormData(event.currentTarget);
     startGoalsTransition(async () => {
       const result = await saveGoals(formData);
       if (!result?.error) setGoalsSaved(true);
@@ -119,7 +136,6 @@ export function SettingsView({
         <h2 className="mt-1 text-3xl font-bold tracking-tight">Personalize FuelTrack</h2>
       </section>
 
-      {/* Profile Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -130,15 +146,9 @@ export function SettingsView({
         <CardContent>
           <form onSubmit={handleSaveProfile} className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 grid gap-2">
+              <div className="grid gap-2 sm:col-span-2">
                 <Label htmlFor="displayName">Display name</Label>
-                <Input
-                  id="displayName"
-                  name="displayName"
-                  value={profile.displayName}
-                  onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
-                  placeholder="Your name"
-                />
+                <Input id="displayName" name="displayName" value={profile.displayName} onChange={(e) => updateProfile("displayName", e.target.value)} placeholder="Your name" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="age">Age</Label>
@@ -147,7 +157,7 @@ export function SettingsView({
                   name="age"
                   inputMode="numeric"
                   value={profile.age}
-                  onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value ? Number(e.target.value) : "" }))}
+                  onChange={(e) => updateProfile("age", e.target.value ? Number(e.target.value) : "")}
                   placeholder="e.g. 25"
                   required
                 />
@@ -155,15 +165,13 @@ export function SettingsView({
               <div className="grid gap-2">
                 <Label>Gender</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(["male", "female"] as Gender[]).map((g) => (
+                  {(["male", "female"] as const satisfies readonly Gender[]).map((g) => (
                     <button
                       key={g}
                       type="button"
-                      onClick={() => setProfile((p) => ({ ...p, gender: g }))}
+                      onClick={() => updateProfile("gender", g)}
                       className={`rounded-md border py-2.5 text-sm font-semibold capitalize transition-colors ${
-                        profile.gender === g
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background hover:bg-accent"
+                        profile.gender === g ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-accent"
                       }`}
                     >
                       {g}
@@ -178,7 +186,7 @@ export function SettingsView({
                   name="heightCm"
                   inputMode="decimal"
                   value={profile.heightCm}
-                  onChange={(e) => setProfile((p) => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : "" }))}
+                  onChange={(e) => updateProfile("heightCm", e.target.value ? Number(e.target.value) : "")}
                   placeholder="e.g. 175"
                   required
                 />
@@ -190,7 +198,7 @@ export function SettingsView({
                   name="weightKg"
                   inputMode="decimal"
                   value={profile.weightKg}
-                  onChange={(e) => setProfile((p) => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : "" }))}
+                  onChange={(e) => updateProfile("weightKg", e.target.value ? Number(e.target.value) : "")}
                   placeholder="e.g. 80"
                   required
                 />
@@ -201,10 +209,10 @@ export function SettingsView({
                   id="activityLevel"
                   name="activityLevel"
                   value={profile.activityLevel}
-                  onChange={(e) => setProfile((p) => ({ ...p, activityLevel: e.target.value as ActivityLevel }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onChange={(e) => updateProfile("activityLevel", e.target.value as ActivityLevel)}
+                  className={SELECT_CLASSES}
                 >
-                  {activityOptions.map((opt) => (
+                  {ACTIVITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
@@ -215,20 +223,19 @@ export function SettingsView({
                   id="fitnessGoal"
                   name="fitnessGoal"
                   value={profile.fitnessGoal}
-                  onChange={(e) => setProfile((p) => ({ ...p, fitnessGoal: e.target.value as FitnessGoal }))}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onChange={(e) => updateProfile("fitnessGoal", e.target.value as FitnessGoal)}
+                  className={SELECT_CLASSES}
                 >
-                  {goalOptions.map((opt) => (
+                  {GOAL_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Recalculate preview */}
             {preview && (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                <p className="text-sm font-semibold text-primary mb-2">Recalculated goals preview</p>
+                <p className="mb-2 text-sm font-semibold text-primary">Recalculated goals preview</p>
                 <div className="grid grid-cols-4 gap-2 text-center">
                   {[
                     { label: "Calories", value: `${preview.calories}` },
@@ -236,7 +243,7 @@ export function SettingsView({
                     { label: "Carbs", value: `${preview.carbs}g` },
                     { label: "Fat", value: `${preview.fat}g` }
                   ].map(({ label, value }) => (
-                    <div key={label} className="rounded-md bg-background border border-border p-2">
+                    <div key={label} className="rounded-md border border-border bg-background p-2">
                       <p className="text-xs text-muted-foreground">{label}</p>
                       <p className="font-bold">{value}</p>
                     </div>
@@ -248,9 +255,7 @@ export function SettingsView({
               </div>
             )}
 
-            {profileError && (
-              <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{profileError}</p>
-            )}
+            {profileError && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{profileError}</p>}
 
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="outline" onClick={recalculate}>
@@ -261,13 +266,12 @@ export function SettingsView({
                 {profilePending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Save profile
               </Button>
-              {profileSaved && <p className="text-sm text-emerald-600 font-medium">Saved!</p>}
+              {profileSaved && <p className="text-sm font-medium text-emerald-600">Saved!</p>}
             </div>
           </form>
         </CardContent>
       </Card>
 
-      {/* Manual Goals Override */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -278,14 +282,7 @@ export function SettingsView({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSaveGoals} className="grid gap-4 sm:grid-cols-2">
-            {([
-              ["calories", "Calories", "kcal"],
-              ["protein", "Protein", "g"],
-              ["carbs", "Carbs", "g"],
-              ["fat", "Fat", "g"],
-              ["waterMl", "Water", "ml"],
-              ["targetWeightKg", "Target weight", "kg"]
-            ] as const).map(([key, label, unit]) => (
+            {GOAL_FIELDS.map(([key, label, unit]) => (
               <div key={key} className="grid gap-2">
                 <Label htmlFor={`goal-${key}`}>{label}</Label>
                 <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring">
@@ -294,28 +291,29 @@ export function SettingsView({
                     name={key}
                     className="border-0 focus-visible:ring-0"
                     value={goals[key]}
-                    onChange={(e) => setGoals((g) => ({ ...g, [key]: Number(e.target.value || 0) }))}
+                    onChange={(e) => setGoals((current) => ({ ...current, [key]: Number(e.target.value || 0) }))}
                     inputMode="decimal"
                   />
                   <span className="flex items-center px-3 text-sm text-muted-foreground">{unit}</span>
                 </div>
               </div>
             ))}
-            <div className="sm:col-span-2 flex items-center gap-3">
+            <div className="flex items-center gap-3 sm:col-span-2">
               <Button type="submit" disabled={goalsPending}>
                 {goalsPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Save goals
               </Button>
-              {goalsSaved && <p className="text-sm text-emerald-600 font-medium">Saved!</p>}
+              {goalsSaved && <p className="text-sm font-medium text-emerald-600">Saved!</p>}
             </div>
           </form>
         </CardContent>
       </Card>
 
-      {/* Micronutrients + Reminders */}
       <section className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Micronutrient Targets</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Micronutrient Targets</CardTitle>
+          </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {Object.entries(nutrientTargets).map(([key, value]) => (
               <div key={key} className="flex items-center justify-between rounded-md bg-secondary/60 p-3">
@@ -333,8 +331,8 @@ export function SettingsView({
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {["Breakfast log reminder", "Evening hydration check", "Weekly report summary"].map((item) => (
-              <label key={item} className="flex items-center justify-between rounded-md border border-border bg-background p-3 cursor-pointer">
+            {REMINDER_ITEMS.map((item) => (
+              <label key={item} className="flex cursor-pointer items-center justify-between rounded-md border border-border bg-background p-3">
                 <span className="font-medium">{item}</span>
                 <input type="checkbox" defaultChecked className="size-4 accent-emerald-600" />
               </label>
