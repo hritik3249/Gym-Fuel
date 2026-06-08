@@ -1,5 +1,5 @@
-const CACHE_NAME = "fueltrack-v1";
-const APP_SHELL = ["/", "/app/dashboard", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "fueltrack-v2";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -22,7 +22,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => caches.match("/app/dashboard"));
+      }).catch(() => caches.match("/"));
     })
   );
 });
