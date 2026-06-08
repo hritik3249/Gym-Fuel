@@ -27,14 +27,14 @@ export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: Pro
 
   return (
     <div className="flex items-center gap-3">
-      <div className="relative size-24 shrink-0">
+      <div className="group relative size-24 shrink-0 cursor-default transition-transform duration-200 ease-out hover:scale-105 active:scale-95">
         <svg className="-rotate-90" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r={RADIUS} className="stroke-muted" strokeWidth="10" fill="none" />
           <circle
             cx="50"
             cy="50"
             r={RADIUS}
-            className={cn("transition-all duration-700 ease-out", RING_COLORS[tone])}
+            className={cn("transition-all duration-700 ease-out group-hover:drop-shadow-[0_0_6px_currentColor]", RING_COLORS[tone])}
             strokeWidth="10"
             fill="none"
             strokeLinecap="round"
