@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <h1 className="text-lg font-bold">Nutrition OS</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="icon" variant="outline" aria-label="Quick add food">
+            <Button size="icon" variant="outline" aria-label="Quick add food" onClick={() => router.push("/app/foods")}>
               <Plus className="size-4" />
             </Button>
             <Button size="icon" variant="ghost" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
