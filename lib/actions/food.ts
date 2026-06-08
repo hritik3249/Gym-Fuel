@@ -111,7 +111,7 @@ export async function saveCustomFood(food: CustomFoodInput) {
   return { success: true, food: data as { id: string } };
 }
 
-const OFF_SEARCH_URL = "https://in.openfoodfacts.org/cgi/search.pl";
+const OFF_SEARCH_URL = "https://world.openfoodfacts.org/api/v2/search";
 const OFF_RESULT_LIMIT = 12;
 const OFF_FETCH_TIMEOUT_MS = 6000;
 
@@ -188,12 +188,9 @@ export async function searchExternalFoods(query: string) {
 
   const url = new URL(OFF_SEARCH_URL);
   url.searchParams.set("search_terms", term);
-  url.searchParams.set("json", "1");
+  url.searchParams.set("countries_tags_en", "India");
   url.searchParams.set("page_size", String(OFF_RESULT_LIMIT));
-  url.searchParams.set(
-    "fields",
-    "code,product_name,brands,serving_size,nutriments"
-  );
+  url.searchParams.set("fields", "code,product_name,brands,serving_size,nutriments");
 
   try {
     const response = await fetch(url, {
