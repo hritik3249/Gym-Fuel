@@ -2,7 +2,6 @@
 
 import { Bell, Calculator, Loader2, LogOut, Save, User } from "lucide-react";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,7 +45,6 @@ export function SettingsView({
   goals: Goal;
   profile: Profile;
 }) {
-  const router = useRouter();
   const [goals, setGoals] = useState<Goal>(initialGoals);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [preview, setPreview] = useState<ReturnType<typeof calculateGoals> | null>(null);

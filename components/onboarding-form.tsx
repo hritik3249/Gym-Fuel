@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Activity, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ const goalOptions: { value: FitnessGoal; label: string; detail: string; emoji: s
 ];
 
 export function OnboardingForm() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [gender, setGender] = useState<Gender>("male");
@@ -62,8 +60,7 @@ export function OnboardingForm() {
       return;
     }
 
-    router.push("/app/dashboard");
-    router.refresh();
+    window.location.href = "/app/dashboard";
   }
 
   return (
