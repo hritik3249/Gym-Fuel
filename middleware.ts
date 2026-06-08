@@ -48,28 +48,36 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — this is critical, do NOT remove
+  // IMPORTANT: Always call getUser() to refresh session
   const { data: { user } } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // If on /app/* and not logged in → redirect to login
+  // Protect /app routes - redirect to login if not authenticated
   if (pathname.startsWith("/app") && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
+    const loginUrl = new URL("/auth/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // If logged in and on auth pages → redirect to dashboard
-  if (pathname.startsWith("/auth") && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/app/dashboard";
-    return NextResponse.redirect(url);
+  // If logged in and hitting auth pages - redirect to dashboard
+  if (pathname.startsWith("/auth") && pathname !== "/auth/callback" && user) {
+    const dashboardUrl = new URL("/app/dashboard", request.url);
+    return NextResponse.redirect(dashboardUrl);
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/auth/:path*"]
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico
+     * - public folder
+     * - manifest and sw files
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|css|webmanifest)$).*)"
+  ]
 };

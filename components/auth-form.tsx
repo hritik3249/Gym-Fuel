@@ -44,14 +44,20 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
       return;
     }
 
-    // Login — hard redirect so session cookie is fully set
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Login
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
-    window.location.href = "/app/dashboard";
+
+    // Wait for session to be fully persisted then redirect
+    if (data.session) {
+      // Small delay to ensure cookie is written
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      window.location.replace("/app/dashboard");
+    }
   }
 
   async function googleLogin() {
@@ -111,7 +117,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" | "reset" }) {
               </div>
             )}
             <Button disabled={loading}>
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+              {loading
+                ? <Loader2 className="size-4 animate-spin" />
+                : <Mail className="size-4" />
+              }
               {mode === "login" ? "Log in" : mode === "signup" ? "Sign up" : "Send reset link"}
             </Button>
           </form>

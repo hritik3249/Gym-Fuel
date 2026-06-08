@@ -14,7 +14,10 @@ export async function GET(request: Request) {
       console.error("Auth callback error:", error.message);
       return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
     }
+    // Session exchanged successfully - redirect to destination
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // No code - redirect to login
+  return NextResponse.redirect(`${origin}/auth/login`);
 }
