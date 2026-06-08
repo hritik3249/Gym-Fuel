@@ -2,6 +2,7 @@
 
 import { Copy, Globe, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -105,7 +106,13 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
     const entry = foodToEntry(food, selectedMeal, quantity);
     setEntries((current) => [entry, ...current]);
     startTransition(async () => {
-      await logFoodEntry({ ...entry, foodId: food.id });
+      const result = await logFoodEntry({ ...entry, foodId: food.id });
+      if (result?.error) {
+        toast.error(`Couldn't log ${food.name}`, { description: result.error });
+        setEntries((current) => current.filter((e) => e.id !== entry.id));
+        return;
+      }
+      toast.success(`Logged ${food.name}`, { description: `${entry.calories} kcal · ${MEALS.find((m) => m.id === selectedMeal)?.label}` });
     });
   }
 
@@ -140,14 +147,27 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
     const duplicate: FoodEntry = { ...entry, id: crypto.randomUUID(), loggedAt: new Date().toISOString() };
     setEntries((current) => [duplicate, ...current]);
     startTransition(async () => {
-      await logFoodEntry(duplicate);
+      const result = await logFoodEntry(duplicate);
+      if (result?.error) {
+        toast.error("Couldn't duplicate entry", { description: result.error });
+        setEntries((current) => current.filter((e) => e.id !== duplicate.id));
+        return;
+      }
+      toast.success(`Duplicated ${duplicate.foodName}`);
     });
   }
 
   async function handleDeleteEntry(id: string) {
+    const entry = entries.find((e) => e.id === id);
     setDeletingId(id);
     setEntries((current) => current.filter((entry) => entry.id !== id));
-    await deleteFoodEntry(id);
+    const result = await deleteFoodEntry(id);
+    if (result?.error) {
+      toast.error("Couldn't delete entry", { description: result.error });
+      if (entry) setEntries((current) => [entry, ...current]);
+    } else if (entry) {
+      toast.success(`Removed ${entry.foodName}`);
+    }
     setDeletingId(null);
   }
 
@@ -157,6 +177,7 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
 
     const result = await saveCustomFood(customFood);
     if (result?.error) {
+      toast.error("Couldn't save custom food", { description: result.error });
       setSavingCustom(false);
       return;
     }
@@ -165,6 +186,7 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
 
     setSavedFoods((current) => [food, ...current]);
     handleLogFood(food);
+    toast.success(`Saved ${food.name} to your foods`);
     setCustomFood(BLANK_CUSTOM_FOOD);
     setSavingCustom(false);
   }

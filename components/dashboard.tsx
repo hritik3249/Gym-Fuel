@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Activity, Award, Flame, GlassWater, Loader2, Scale, Utensils } from "lucide-react";
+import { toast } from "sonner";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ProgressRing } from "@/components/progress-ring";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,7 +68,13 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
   function handleAddWater(amount: number) {
     setWaterTotal((prev) => prev + amount);
     startTransition(async () => {
-      await logWater(amount);
+      const result = await logWater(amount);
+      if (result?.error) {
+        toast.error("Couldn't log water", { description: result.error });
+        setWaterTotal((prev) => prev - amount);
+        return;
+      }
+      toast.success(`Logged ${formatWaterAmount(amount)} of water`);
     });
   }
 

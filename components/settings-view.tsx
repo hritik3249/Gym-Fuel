@@ -2,6 +2,7 @@
 
 import { Bell, Calculator, Loader2, LogOut, Save, User } from "lucide-react";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -103,11 +104,13 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
     startProfileTransition(async () => {
       const result = await saveProfile(formData);
       if (result?.error) {
+        toast.error("Couldn't save profile", { description: result.error });
         setProfileError(result.error);
         return;
       }
       if (result?.calculated) setGoals((current) => applyCalculatedGoals(current, result.calculated));
       setProfileSaved(true);
+      toast.success("Profile saved");
     });
   }
 
@@ -118,7 +121,12 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
     const formData = new FormData(event.currentTarget);
     startGoalsTransition(async () => {
       const result = await saveGoals(formData);
-      if (!result?.error) setGoalsSaved(true);
+      if (result?.error) {
+        toast.error("Couldn't save goals", { description: result.error });
+        return;
+      }
+      setGoalsSaved(true);
+      toast.success("Goals saved");
     });
   }
 

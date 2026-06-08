@@ -2,6 +2,7 @@
 
 import { Loader2, Plus, Ruler, Scale, TrendingDown } from "lucide-react";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,9 +66,12 @@ export function WeightView({ logs }: { logs: WeightLog[] }) {
     startTransition(async () => {
       const result = await logWeight({ weightKg: newLog.weightKg, bodyFatPercent: newLog.bodyFatPercent, waistCm: newLog.waistCm });
       if (result?.error) {
+        toast.error("Couldn't log weight", { description: result.error });
         setError(result.error);
         setWeightLogs((current) => current.filter((log) => log.id !== newLog.id));
+        return;
       }
+      toast.success(`Logged ${newLog.weightKg}kg`);
     });
   }
 
