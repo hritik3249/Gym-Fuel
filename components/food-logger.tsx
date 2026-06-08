@@ -1,7 +1,7 @@
 "use client";
 
-import { Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { Copy, Globe, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { foodToEntry, sumEntries } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
-import { logFoodEntry, deleteFoodEntry, saveCustomFood } from "@/lib/actions/food";
+import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchExternalFoods } from "@/lib/actions/food";
 import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
 
 const MEALS: Array<{ id: MealType; label: string }> = [
@@ -41,6 +41,8 @@ const BLANK_CUSTOM_FOOD: Omit<Food, "id" | "source"> = {
 
 const RECENT_ENTRIES_SHOWN = 4;
 const FREQUENT_FOODS_SHOWN = 5;
+const EXTERNAL_SEARCH_MIN_LENGTH = 3;
+const EXTERNAL_SEARCH_DEBOUNCE_MS = 450;
 
 function matchesSearch(food: Food, term: string) {
   if (!term) return true;
@@ -63,11 +65,38 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
   const [isPending, startTransition] = useTransition();
   const [savingCustom, setSavingCustom] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [externalFoods, setExternalFoods] = useState<Food[]>([]);
+  const [searchingExternal, setSearchingExternal] = useState(false);
 
   const filteredFoods = useMemo(() => {
     const term = query.trim().toLowerCase();
     return savedFoods.filter((food) => matchesSearch(food, term));
   }, [query, savedFoods]);
+
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < EXTERNAL_SEARCH_MIN_LENGTH) {
+      setExternalFoods([]);
+      setSearchingExternal(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchingExternal(true);
+
+    const timer = setTimeout(async () => {
+      const result = await searchExternalFoods(term);
+      if (!cancelled) {
+        setExternalFoods(result.foods);
+        setSearchingExternal(false);
+      }
+    }, EXTERNAL_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   function handleLogFood(food: Food, quantity = 1) {
     const entry = foodToEntry(food, selectedMeal, quantity);
@@ -210,6 +239,47 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
         </Card>
 
         <div className="grid gap-4">
+          {query.trim().length >= EXTERNAL_SEARCH_MIN_LENGTH && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="size-4 text-primary" />
+                  Online results
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {searchingExternal ? (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" />
+                    Searching Open Food Facts for &ldquo;{query.trim()}&rdquo;...
+                  </p>
+                ) : externalFoods.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    No packaged-food matches online for &ldquo;{query.trim()}&rdquo;.
+                  </p>
+                ) : (
+                  externalFoods.map((food) => (
+                    <div key={food.id} className="grid gap-2 rounded-lg border border-border bg-background p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold">{food.name}</p>
+                          {food.brand && <span className="text-xs text-muted-foreground">{food.brand}</span>}
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {food.serving} · {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fat}g
+                        </p>
+                      </div>
+                      <Button variant="secondary" size="sm" onClick={() => handleLogFood(food)} disabled={isPending}>
+                        <Plus className="size-3.5" />
+                        Log
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Create Custom Food</CardTitle>
