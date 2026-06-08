@@ -1,6 +1,6 @@
 export type MealType = "breakfast" | "lunch" | "dinner" | "snacks";
 
-export type FoodSource = "custom" | "usda" | "open_food_facts" | "seed";
+export type FoodSource = "custom" | "usda" | "seed";
 
 /** Per-100g-or-per-serving nutrient values shared by foods and logged entries. */
 export type Nutrients = {

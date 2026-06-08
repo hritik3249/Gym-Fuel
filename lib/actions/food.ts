@@ -112,98 +112,6 @@ export async function saveCustomFood(food: CustomFoodInput) {
   return { success: true, food: data as { id: string } };
 }
 
-const OFF_SEARCH_URL = "https://world.openfoodfacts.org/api/v2/search";
-const OFF_RESULT_LIMIT = 12;
-const OFF_FETCH_TIMEOUT_MS = 6000;
-
-type OffNutriments = Partial<Record<
-  | "energy-kcal_100g"
-  | "proteins_100g"
-  | "carbohydrates_100g"
-  | "fat_100g"
-  | "fiber_100g"
-  | "iron_100g"
-  | "calcium_100g"
-  | "magnesium_100g"
-  | "zinc_100g"
-  | "potassium_100g"
-  | "sodium_100g"
-  | "vitamin-d_100g"
-  | "vitamin-b12_100g",
-  number
->>;
-
-type OffProduct = {
-  code?: string;
-  product_name?: string;
-  brands?: string;
-  serving_size?: string;
-  nutriments?: OffNutriments;
-};
-
-/** Open Food Facts reports minerals/vitamins in grams; the app stores them in mg/mcg. */
-function gramsToMilligrams(value?: number) {
-  return value ? Math.round(value * 1000 * 100) / 100 : 0;
-}
-
-function gramsToMicrograms(value?: number) {
-  return value ? Math.round(value * 1_000_000 * 100) / 100 : 0;
-}
-
-function roundNutrient(value?: number) {
-  return value ? Math.round(value * 100) / 100 : 0;
-}
-
-function mapOffProduct(product: OffProduct): Food | null {
-  const name = product.product_name?.trim();
-  if (!name || !product.code) return null;
-
-  const n = product.nutriments ?? {};
-  return {
-    id: `off-${product.code}`,
-    name,
-    brand: product.brands?.split(",")[0]?.trim() || undefined,
-    serving: product.serving_size?.trim() || "100g",
-    source: "open_food_facts",
-    cuisine: "Indian",
-    calories: roundNutrient(n["energy-kcal_100g"]),
-    protein: roundNutrient(n["proteins_100g"]),
-    carbs: roundNutrient(n["carbohydrates_100g"]),
-    fat: roundNutrient(n["fat_100g"]),
-    fiber: roundNutrient(n["fiber_100g"]),
-    iron: gramsToMilligrams(n["iron_100g"]),
-    calcium: gramsToMilligrams(n["calcium_100g"]),
-    magnesium: gramsToMilligrams(n["magnesium_100g"]),
-    zinc: gramsToMilligrams(n["zinc_100g"]),
-    potassium: gramsToMilligrams(n["potassium_100g"]),
-    sodium: gramsToMilligrams(n["sodium_100g"]),
-    vitaminD: gramsToMicrograms(n["vitamin-d_100g"]),
-    vitaminB12: gramsToMicrograms(n["vitamin-b12_100g"])
-  };
-}
-
-/** Live-searches Open Food Facts' India catalog for packaged/branded foods. */
-async function searchOpenFoodFacts(term: string): Promise<Food[]> {
-  const url = new URL(OFF_SEARCH_URL);
-  url.searchParams.set("search_terms", term);
-  url.searchParams.set("countries_tags_en", "India");
-  url.searchParams.set("page_size", String(OFF_RESULT_LIMIT));
-  url.searchParams.set("fields", "code,product_name,brands,serving_size,nutriments");
-
-  try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(OFF_FETCH_TIMEOUT_MS),
-      headers: { "User-Agent": "FuelTrack - nutrition tracker" }
-    });
-    if (!response.ok) return [];
-
-    const data = (await response.json()) as { products?: OffProduct[] };
-    return (data.products ?? []).map(mapOffProduct).filter((food): food is Food => food !== null && food.calories > 0);
-  } catch {
-    return [];
-  }
-}
-
 const USDA_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search";
 const USDA_API_KEY = process.env.USDA_FDC_API_KEY ?? "DEMO_KEY";
 const USDA_RESULT_LIMIT = 12;
@@ -266,11 +174,10 @@ async function searchUsda(term: string): Promise<Food[]> {
   }
 }
 
-/** Live-searches USDA FoodData Central and Open Food Facts in parallel and merges the results. */
+/** Live-searches USDA FoodData Central for raw ingredients and generic foods. */
 export async function searchExternalFoods(query: string) {
   const term = query.trim();
   if (term.length < 3) return { foods: [] as Food[] };
 
-  const [usdaFoods, offFoods] = await Promise.all([searchUsda(term), searchOpenFoodFacts(term)]);
-  return { foods: [...usdaFoods, ...offFoods] };
+  return { foods: await searchUsda(term) };
 }
