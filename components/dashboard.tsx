@@ -83,7 +83,7 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
 
   return (
     <div className="container grid gap-4 py-4 sm:py-6">
-      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr] animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="surface-glass rounded-lg p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -122,7 +122,7 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
                   key={amount}
                   onClick={() => handleAddWater(amount)}
                   disabled={isPending}
-                  className="flex items-center justify-center rounded-md border border-border bg-background py-2 text-xs font-semibold hover:bg-accent disabled:opacity-50"
+                  className="flex items-center justify-center rounded-md border border-border bg-background py-2 text-xs font-semibold transition-all duration-150 hover:bg-accent hover:-translate-y-0.5 active:scale-95 disabled:opacity-50"
                 >
                   {isPending ? <Loader2 className="size-3 animate-spin" /> : formatWaterAmount(amount)}
                 </button>
@@ -132,7 +132,7 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100 fill-mode-both">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+      <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr] animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -244,7 +244,7 @@ export function Dashboard({ displayName, goals, totals, water, weight, entries, 
         </Card>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-3 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-200 fill-mode-both">
         {[
           ["Weekly adherence", "—", "Log 7 days to see"],
           ["Avg protein", totals.protein > 0 ? `${formatNumber(totals.protein, 0)}g` : "—", "Today's protein"],
