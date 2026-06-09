@@ -298,22 +298,16 @@ export async function getDashboardSnapshot(date?: string): Promise<DashboardSnap
   const dayStart = `${today}T00:00:00`;
   const dayEnd   = `${today}T23:59:59`;
 
-  const [goalsRes, entriesRes, waterRes, weightRes, foodsRes, streakRes, profileRes] = await Promise.all([
+  const [goalsRes, entriesRes, waterRes, weightRes, streakRes, profileRes] = await Promise.all([
     supabase.from("goals").select("*").eq("user_id", user.id).single(),
     supabase
       .from("food_entries")
       .select("*")
       .eq("user_id", user.id)
-      .eq("entry_date", today)                 // indexed — much faster than gte/lte
+      .eq("entry_date", today)
       .order("logged_at", { ascending: false }),
     supabase.from("water_logs").select("*").eq("user_id", user.id).gte("logged_at", dayStart).lte("logged_at", dayEnd),
     supabase.from("weight_logs").select("*").eq("user_id", user.id).order("logged_at", { ascending: false }).limit(RECENT_WEIGHT_LOGS),
-    supabase
-      .from("foods")
-      .select("*")
-      .or(`owner_id.eq.${user.id},owner_id.is.null`)
-      .order("created_at", { ascending: false })
-      .limit(RECENT_FOODS),
     supabase.from("streaks").select("*").eq("user_id", user.id).single(),
     supabase.from("profiles").select("current_weight_kg, age, fitness_goal").eq("id", user.id).single()
   ]);
@@ -326,7 +320,6 @@ export async function getDashboardSnapshot(date?: string): Promise<DashboardSnap
   const entries = (entriesRes.data ?? []).map(mapEntry);
   const waterLogs = (waterRes.data ?? []).map(mapWaterLog);
   const weightLogs = (weightRes.data ?? []).map(mapWeightLog).reverse();
-  const foods = (foodsRes.data ?? []).map(mapFood);
 
   const totals = sumEntries(entries);
   const water = waterLogs.reduce((sum, log) => sum + log.amountMl, 0);
@@ -340,7 +333,7 @@ export async function getDashboardSnapshot(date?: string): Promise<DashboardSnap
     water,
     currentWeight,
     entries,
-    foods,
+    foods: [],    // dashboard doesn't use the food catalogue — fetched only on /app/foods
     waterLogs,
     weightLogs,
     trends: buildTrendFrame(weightLogs),
