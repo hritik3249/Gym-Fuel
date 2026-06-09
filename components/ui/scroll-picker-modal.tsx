@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Check, X } from "lucide-react";
 import { ScrollPicker } from "@/components/ui/scroll-picker";
 
@@ -19,6 +19,25 @@ export function ScrollPickerModal({
   label, unit, min, max, step = 1, value, onConfirm, onClose
 }: ScrollPickerModalProps) {
   const [draft, setDraft] = useState(value);
+  // Track whether the sheet has mounted — animation runs exactly once
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const didMount = useRef(false);
+
+  // One-shot entrance animation on mount only
+  useEffect(() => {
+    if (didMount.current) return;
+    didMount.current = true;
+    const el = sheetRef.current;
+    if (!el) return;
+    el.style.transform = "translateY(40px)";
+    el.style.opacity = "0";
+    // Force a paint then transition in
+    requestAnimationFrame(() => {
+      el.style.transition = "transform 220ms cubic-bezier(0.22,1,0.36,1), opacity 180ms ease";
+      el.style.transform = "translateY(0)";
+      el.style.opacity = "1";
+    });
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -28,13 +47,22 @@ export function ScrollPickerModal({
   }, [onClose]);
 
   return (
-    /* Backdrop */
+    /* Backdrop — absorbs all pointer events so nothing bleeds through */
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      // Stop wheel events at the backdrop so hovering outside can't scroll the picker
+      onWheel={(e) => e.stopPropagation()}
     >
-      {/* Sheet */}
-      <div className="animate-in slide-in-from-bottom-4 fade-in duration-200 w-full max-w-sm rounded-t-2xl border border-border bg-card p-6 sm:rounded-2xl">
+      {/* Sheet — no Tailwind animation class, animated via ref above */}
+      <div
+        ref={sheetRef}
+        className="w-full max-w-sm rounded-t-2xl border border-border bg-card p-6 sm:rounded-2xl"
+        style={{ willChange: "transform, opacity" }}
+        // Prevent any wheel/pointer events leaking out of the sheet
+        onWheel={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -52,8 +80,11 @@ export function ScrollPickerModal({
           </button>
         </div>
 
-        {/* Picker */}
-        <div className="flex justify-center">
+        {/* Picker — wheel events contained inside */}
+        <div
+          className="flex justify-center"
+          onWheel={(e) => e.stopPropagation()}
+        >
           <ScrollPicker
             min={min} max={max} step={step}
             value={draft} onChange={setDraft}
