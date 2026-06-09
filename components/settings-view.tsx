@@ -295,7 +295,8 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {GOAL_PICKERS.map((picker) => {
                 const { key, label, unit, step } = picker;
-                const val = Number(goals[key]);
+                const raw = Number(goals[key]);
+                const val = Number.isFinite(raw) ? raw : 0;
                 const display = step < 1 ? val.toFixed(1) : String(Math.round(val));
                 return (
                   <button

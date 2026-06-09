@@ -35,8 +35,10 @@ export interface ScrollPickerProps {
 }
 
 export function ScrollPicker({
-  min, max, step = 1, value, onChange, label, unit, className
+  min, max, step = 1, value: rawValue, onChange, label, unit, className
 }: ScrollPickerProps) {
+  // Guard against NaN / undefined coming from parent
+  const value = Number.isFinite(rawValue) ? rawValue : min;
   const containerRef = useRef<HTMLDivElement>(null);
   const values = buildValues(min, max, step);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -6,15 +6,20 @@ import { defaultGoals } from "@/lib/nutrition";
 import type { Goal } from "@/lib/types";
 import type { ActivityLevel, FitnessGoal, Gender } from "@/lib/calculator";
 
+function safeNum(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 function mapGoals(row: Record<string, unknown> | null): Goal {
   if (!row) return defaultGoals;
   return {
-    calories: Number(row.calories),
-    protein: Number(row.protein),
-    carbs: Number(row.carbs),
-    fat: Number(row.fat),
-    waterMl: Number(row.water_ml),
-    targetWeightKg: Number(row.target_weight_kg)
+    calories:       safeNum(row.calories,         defaultGoals.calories),
+    protein:        safeNum(row.protein,           defaultGoals.protein),
+    carbs:          safeNum(row.carbs,             defaultGoals.carbs),
+    fat:            safeNum(row.fat,               defaultGoals.fat),
+    waterMl:        safeNum(row.water_ml,          defaultGoals.waterMl),
+    targetWeightKg: safeNum(row.target_weight_kg,  defaultGoals.targetWeightKg),
   };
 }
 
