@@ -42,12 +42,14 @@ const GOAL_PICKERS = [
 ] as const;
 
 const REMINDER_CONFIG = [
-  { key: "breakfast" as const, label: "Breakfast log reminder",  detail: "Every morning at 8 AM"    },
-  { key: "hydration" as const, label: "Evening hydration check", detail: "Every evening at 8 PM"    },
-  { key: "weekly"    as const, label: "Weekly report summary",   detail: "Every Sunday at 9 AM"     },
+  { key: "breakfast" as const, label: "Breakfast reminder",      detail: "Every morning at 8 AM"    },
+  { key: "lunch"     as const, label: "Lunch reminder",          detail: "Daily nudge at 8 AM"       },
+  { key: "dinner"    as const, label: "Dinner reminder",         detail: "Every evening at 8 PM"     },
+  { key: "hydration" as const, label: "Hydration check",         detail: "Every evening at 8 PM"     },
+  { key: "weekly"    as const, label: "Weekly report summary",   detail: "Every Sunday at 8 AM"      },
 ];
 
-type ReminderKey = "breakfast" | "hydration" | "weekly";
+type ReminderKey = "breakfast" | "lunch" | "dinner" | "hydration" | "weekly";
 type ReminderPrefs = Record<ReminderKey, boolean>;
 
 const SELECT_CLASSES =
@@ -152,7 +154,7 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile, rem
       await saveReminderPrefs(updated);
 
       // Unsubscribe from push entirely if all reminders are now off
-      if (!updated.breakfast && !updated.hydration && !updated.weekly) {
+      if (!updated.breakfast && !updated.lunch && !updated.dinner && !updated.hydration && !updated.weekly) {
         const sub = await getSubscription();
         if (sub) { await sub.unsubscribe(); await unsubscribePush(sub.endpoint); }
       }

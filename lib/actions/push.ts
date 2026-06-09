@@ -33,8 +33,10 @@ export async function unsubscribePush(endpoint: string) {
 /** Persist which reminder toggles the user has enabled. */
 export async function saveReminderPrefs(prefs: {
   breakfast: boolean;
+  lunch:     boolean;
+  dinner:    boolean;
   hydration: boolean;
-  weekly: boolean;
+  weekly:    boolean;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -44,6 +46,8 @@ export async function saveReminderPrefs(prefs: {
     .from("profiles")
     .update({
       reminder_breakfast: prefs.breakfast,
+      reminder_lunch:     prefs.lunch,
+      reminder_dinner:    prefs.dinner,
       reminder_hydration: prefs.hydration,
       reminder_weekly:    prefs.weekly,
       updated_at: new Date().toISOString(),

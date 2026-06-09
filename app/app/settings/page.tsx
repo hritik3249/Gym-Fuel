@@ -47,6 +47,8 @@ export default async function SettingsPage() {
 
   const reminders = {
     breakfast: profileData?.reminder_breakfast ?? false,
+    lunch:     profileData?.reminder_lunch     ?? false,
+    dinner:    profileData?.reminder_dinner    ?? false,
     hydration: profileData?.reminder_hydration ?? false,
     weekly:    profileData?.reminder_weekly    ?? false,
   };

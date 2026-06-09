@@ -5,7 +5,7 @@
       "schedule": "30 2 * * *"
     },
     {
-      "path": "/api/cron?type=hydration",
+      "path": "/api/cron?type=evening",
       "schedule": "30 14 * * *"
     }
   ]

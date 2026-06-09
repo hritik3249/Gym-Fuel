@@ -15,6 +15,20 @@ const REMINDERS: Record<string, PushPayload & { column: string }> = {
     url:    "/app/foods",
     tag:    "breakfast",
   },
+  lunch: {
+    column: "reminder_lunch",
+    title:  "🥗 Don't forget to log lunch",
+    body:   "Keep your nutrition on track — log your midday meal.",
+    url:    "/app/foods",
+    tag:    "lunch",
+  },
+  dinner: {
+    column: "reminder_dinner",
+    title:  "🍽️ Log your dinner",
+    body:   "End your day strong — track your evening meal.",
+    url:    "/app/foods",
+    tag:    "dinner",
+  },
   hydration: {
     column: "reminder_hydration",
     title:  "💧 Evening hydration check",
@@ -79,13 +93,22 @@ export async function GET(req: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // "morning" = breakfast daily + weekly on Sundays — uses one cron slot
+  // "morning"  = breakfast + lunch reminder daily, weekly on Sundays  (8 AM IST)
   if (type === "morning") {
     const results: Record<string, { sent: number; stale: number }> = {};
     results.breakfast = await sendReminder(supabase, "breakfast");
+    results.lunch     = await sendReminder(supabase, "lunch");
     if (new Date().getUTCDay() === 0) {
       results.weekly = await sendReminder(supabase, "weekly");
     }
+    return NextResponse.json(results);
+  }
+
+  // "evening"  = dinner + hydration check daily  (8 PM IST)
+  if (type === "evening") {
+    const results: Record<string, { sent: number; stale: number }> = {};
+    results.dinner    = await sendReminder(supabase, "dinner");
+    results.hydration = await sendReminder(supabase, "hydration");
     return NextResponse.json(results);
   }
 
