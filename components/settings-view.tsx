@@ -1,7 +1,7 @@
 "use client";
 
-import { Bell, Calculator, Loader2, LogOut, Save, User } from "lucide-react";
-import { useState, useTransition, useEffect, useRef } from "react";
+import { Bell, BellOff, Calculator, Loader2, LogOut, Save, User } from "lucide-react";
+import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { ScrollPickerModal } from "@/components/ui/scroll-picker-modal";
 import { nutrientTargets } from "@/lib/nutrition";
 import { saveProfile } from "@/lib/actions/profile";
 import { saveGoals } from "@/lib/actions/goals";
+import { subscribePush, unsubscribePush, saveReminderPrefs } from "@/lib/actions/push";
 import { createClient } from "@/lib/supabase/browser";
 import { calculateGoals } from "@/lib/calculator";
 import type { ActivityLevel, CalculatedGoals, FitnessGoal, Gender } from "@/lib/calculator";
@@ -40,7 +41,14 @@ const GOAL_PICKERS = [
   { key: "targetWeightKg" as keyof Goal, label: "Target weight",  unit: "kg",   min: 30,   max: 200,  step: 0.5 },
 ] as const;
 
-const REMINDER_ITEMS = ["Breakfast log reminder", "Evening hydration check", "Weekly report summary"];
+const REMINDER_CONFIG = [
+  { key: "breakfast" as const, label: "Breakfast log reminder",  detail: "Every morning at 8 AM"    },
+  { key: "hydration" as const, label: "Evening hydration check", detail: "Every evening at 8 PM"    },
+  { key: "weekly"    as const, label: "Weekly report summary",   detail: "Every Sunday at 9 AM"     },
+];
+
+type ReminderKey = "breakfast" | "hydration" | "weekly";
+type ReminderPrefs = Record<ReminderKey, boolean>;
 
 const SELECT_CLASSES =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -67,7 +75,11 @@ function applyCalculatedGoals(goals: Goal, calculated: CalculatedGoals): Goal {
   };
 }
 
-export function SettingsView({ goals: initialGoals, profile: initialProfile }: { goals: Goal; profile: SettingsProfile }) {
+export function SettingsView({ goals: initialGoals, profile: initialProfile, reminders: initialReminders }: {
+  goals: Goal;
+  profile: SettingsProfile;
+  reminders: ReminderPrefs;
+}) {
   const [goals, setGoals] = useState<Goal>(initialGoals);
   const [profile, setProfile] = useState<SettingsProfile>(initialProfile);
   const [preview, setPreview] = useState<CalculatedGoals | null>(null);
@@ -80,6 +92,78 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
   const [activePicker, setActivePicker] = useState<typeof GOAL_PICKERS[number] | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Push notification state ──────────────────────────────────────────────
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [reminders, setReminders]   = useState<ReminderPrefs>(initialReminders);
+  const [reminderPending, setReminderPending] = useState(false);
+  useEffect(() => {
+    if (typeof Notification !== "undefined") setPermission(Notification.permission);
+  }, []);
+
+  const getSubscription = useCallback(async (): Promise<PushSubscription | null> => {
+    if (!("serviceWorker" in navigator)) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return reg.pushManager.getSubscription();
+  }, []);
+
+  const createSubscription = useCallback(async (): Promise<PushSubscription | null> => {
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return null;
+    const reg = await navigator.serviceWorker.ready;
+    const raw = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const padding = "=".repeat((4 - (raw.length % 4)) % 4);
+    const base64 = (raw + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const binary = atob(base64);
+    const applicationServerKey = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) applicationServerKey[i] = binary.charCodeAt(i);
+    return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+  }, []);
+
+  async function handleReminderToggle(key: ReminderKey, enabled: boolean) {
+    setReminderPending(true);
+    try {
+      // Request permission if needed
+      if (enabled && permission !== "granted") {
+        const result = await Notification.requestPermission();
+        setPermission(result);
+        if (result !== "granted") {
+          toast.error("Notification permission denied", { description: "Enable notifications in your browser settings." });
+          setReminderPending(false);
+          return;
+        }
+      }
+
+      // Ensure a push subscription exists when enabling any reminder
+      if (enabled) {
+        let sub = await getSubscription();
+        if (!sub) sub = await createSubscription();
+        if (sub) {
+          const j = sub.toJSON();
+          await subscribePush({
+            endpoint: j.endpoint!,
+            p256dh:   j.keys!.p256dh,
+            auth:     j.keys!.auth,
+          });
+        }
+      }
+
+      const updated = { ...reminders, [key]: enabled };
+      setReminders(updated);
+      await saveReminderPrefs(updated);
+
+      // Unsubscribe from push entirely if all reminders are now off
+      if (!updated.breakfast && !updated.hydration && !updated.weekly) {
+        const sub = await getSubscription();
+        if (sub) { await sub.unsubscribe(); await unsubscribePush(sub.endpoint); }
+      }
+
+      toast.success(enabled ? "Reminder enabled" : "Reminder disabled");
+    } catch {
+      toast.error("Failed to update reminder");
+    } finally {
+      setReminderPending(false);
+    }
+  }
 
   function updateProfile<K extends keyof SettingsProfile>(field: K, value: SettingsProfile[K]) {
     setProfile((current) => ({ ...current, [field]: value }));
@@ -354,12 +438,49 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {REMINDER_ITEMS.map((item) => (
-              <label key={item} className="flex cursor-pointer items-center justify-between rounded-md border border-border bg-background p-3">
-                <span className="font-medium">{item}</span>
-                <input type="checkbox" defaultChecked className="size-4 accent-emerald-600" />
+            {/* Permission banner */}
+            {permission === "denied" && (
+              <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <BellOff className="size-4 shrink-0" />
+                <span>Notifications blocked. Enable them in your browser / phone settings, then reload.</span>
+              </div>
+            )}
+            {permission === "default" && (
+              <p className="text-xs text-muted-foreground">
+                Turn on a reminder below and your browser will ask for notification permission.
+              </p>
+            )}
+
+            {/* Reminder toggles */}
+            {REMINDER_CONFIG.map(({ key, label, detail }) => (
+              <label
+                key={key}
+                className={`flex cursor-pointer items-center justify-between rounded-lg border bg-background p-3 transition-colors ${
+                  reminders[key] ? "border-primary/40 bg-primary/5" : "border-border"
+                } ${reminderPending ? "pointer-events-none opacity-60" : ""}`}
+              >
+                <div>
+                  <p className="font-medium">{label}</p>
+                  <p className="text-xs text-muted-foreground">{detail}</p>
+                </div>
+                {/* Toggle switch */}
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={reminders[key]}
+                  disabled={reminderPending || permission === "denied"}
+                  onClick={() => handleReminderToggle(key, !reminders[key])}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none ${
+                    reminders[key] ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${
+                    reminders[key] ? "translate-x-6" : "translate-x-1"
+                  }`} />
+                </button>
               </label>
             ))}
+
             <Button variant="outline" onClick={handleSignOut} disabled={signingOut} className="mt-2">
               {signingOut ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
               Sign out

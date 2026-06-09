@@ -13,15 +13,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-
-  // Never cache page navigations or API/data calls — every route here is auth-gated
-  // and per-user, so a cached response could leak one account's page to another
-  // session (or replay a stale logged-out redirect). Only static assets are cached.
   if (event.request.mode === "navigate" || event.request.destination === "document") {
     event.respondWith(fetch(event.request));
     return;
   }
-
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -32,6 +27,37 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       });
+    })
+  );
+});
+
+// ── Push notifications ─────────────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload;
+  try { payload = event.data.json(); }
+  catch { payload = { title: "FuelTrack", body: event.data.text() }; }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title ?? "FuelTrack", {
+      body:    payload.body  ?? "",
+      icon:    "/icon.svg",
+      badge:   "/icon.svg",
+      tag:     payload.tag  ?? "fueltrack",
+      data:    { url: payload.url ?? "/app/dashboard" },
+      vibrate: [100, 50, 100],
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? "/app/dashboard";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const existing = list.find((c) => c.url.includes(self.location.origin));
+      if (existing) { existing.focus(); existing.navigate(url); }
+      else clients.openWindow(url);
     })
   );
 });

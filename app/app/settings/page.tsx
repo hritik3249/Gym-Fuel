@@ -45,5 +45,11 @@ export default async function SettingsPage() {
     fitnessGoal: (profileData?.fitness_goal ?? "maintain") as FitnessGoal
   };
 
-  return <SettingsView goals={mapGoals(goalsData)} profile={profile} />;
+  const reminders = {
+    breakfast: profileData?.reminder_breakfast ?? false,
+    hydration: profileData?.reminder_hydration ?? false,
+    weekly:    profileData?.reminder_weekly    ?? false,
+  };
+
+  return <SettingsView goals={mapGoals(goalsData)} profile={profile} reminders={reminders} />;
 }
