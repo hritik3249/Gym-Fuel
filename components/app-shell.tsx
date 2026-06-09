@@ -51,12 +51,21 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
 
   useEffect(() => {
     const today = localDateISO();
-    const href  = `/app/dashboard?date=${today}`;
-    setDashboardHref(href);
+    const dash  = `/app/dashboard?date=${today}`;
+    setDashboardHref(dash);
 
-    // Prefetch all tabs with the correct date so first-visit loads are instant too.
-    router.prefetch(href);
-    for (const item of STATIC_NAV) router.prefetch(item.href);
+    const allHrefs = [dash, ...STATIC_NAV.map((i) => i.href)];
+
+    // Prefetch = fetch + cache the full RSC payload for every tab.
+    // With staleTimes.dynamic=30 this makes every tab switch instant.
+    const prefetchAll = () => allHrefs.forEach((h) => router.prefetch(h));
+
+    prefetchAll(); // fire immediately on mount
+
+    // Re-warm every 20 s so the cache (expires at 30 s) never goes cold
+    // while the app is open. Cancelled on unmount.
+    const id = setInterval(prefetchAll, 20_000);
+    return () => clearInterval(id);
   }, [router]);
 
   return (
