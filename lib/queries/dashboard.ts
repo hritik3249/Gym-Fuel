@@ -141,7 +141,10 @@ function buildTrendFrame(weightLogs: WeightLog[]): DailyTrend[] {
   });
 }
 
-/** Resolves the current user and whether they've completed onboarding, via a single lightweight query. */
+/** Resolves the current user and whether they've completed onboarding, via a single lightweight query.
+ *  We check profiles.age because the DB trigger auto-creates a goals row for every new user
+ *  (including Google OAuth), so we can't rely on goals existence. A null age means the user
+ *  hasn't completed the onboarding wizard yet. */
 async function requireSession() {
   const supabase = await createClient();
   const {
@@ -150,8 +153,8 @@ async function requireSession() {
 
   if (!user) return null;
 
-  const { data: goalsRow } = await supabase.from("goals").select("user_id").eq("user_id", user.id).maybeSingle();
-  return { supabase, user, isNewUser: !goalsRow };
+  const { data: profile } = await supabase.from("profiles").select("age").eq("id", user.id).maybeSingle();
+  return { supabase, user, isNewUser: !profile?.age };
 }
 
 export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; isNewUser: boolean };
@@ -303,8 +306,10 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     supabase.from("profiles").select("current_weight_kg, age, fitness_goal").eq("id", user.id).single()
   ]);
 
-  // A user is "new" until they've completed onboarding and have goals saved.
-  const isNewUser = !goalsRes.data;
+  // A user is "new" until they've completed onboarding wizard (which sets their age).
+  // We can't check goals presence because the DB trigger auto-creates a goals row
+  // for every new user (including Google OAuth) with default values.
+  const isNewUser = !profileRes.data?.age;
 
   const entries = (entriesRes.data ?? []).map(mapEntry);
   const waterLogs = (waterRes.data ?? []).map(mapWaterLog);

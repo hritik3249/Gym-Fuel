@@ -59,13 +59,13 @@ function StepShell({ children, title, subtitle }: { children: React.ReactNode; t
 }
 
 /* ── Main component ───────────────────────────────── */
-export function OnboardingForm() {
+export function OnboardingForm({ defaultName = "" }: { defaultName?: string }) {
   const [step, setStep]               = useState(0);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
 
   // Fields
-  const [displayName, setDisplayName] = useState("");
+  const [displayName, setDisplayName] = useState(defaultName);
   const [age,         setAge]         = useState(25);
   const [gender,      setGender]      = useState<Gender>("male");
   const [heightCm,    setHeightCm]    = useState(170);
