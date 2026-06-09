@@ -3,15 +3,14 @@
 import { useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
-const ITEM_H = 44;   // px per item
-const VISIBLE = 5;   // items shown (odd — centre = selected)
-const PAD = ((VISIBLE - 1) / 2) * ITEM_H;   // 88px top/bottom pad
+const ITEM_H = 44;
+const VISIBLE = 5;
+const PAD = ((VISIBLE - 1) / 2) * ITEM_H; // 88px
 
 function buildValues(min: number, max: number, step: number): number[] {
   const out: number[] = [];
   const count = Math.round((max - min) / step);
   for (let i = 0; i <= count; i++) {
-    // Round to 3 decimal places to kill float drift (e.g. 0.1+0.2 = 0.30000…)
     out.push(Math.round((min + i * step) * 1000) / 1000);
   }
   return out;
@@ -35,36 +34,42 @@ export interface ScrollPickerProps {
 export function ScrollPicker({
   min, max, step = 1, value: rawValue, onChange, label, unit, className
 }: ScrollPickerProps) {
-  // Guard against NaN / undefined coming from parent
   const value = Number.isFinite(rawValue) ? rawValue : min;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const values = buildValues(min, max, step);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef  = useRef<HTMLDivElement>(null);
+  const isScrolling   = useRef(false);   // true while user is actively scrolling
+  const commitTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const values        = buildValues(min, max, step);
 
-  // Scroll to value whenever it changes externally
+  // Scroll to the current value — but ONLY when user is not scrolling
+  // (prevents the feedback loop that causes the glitch)
   useEffect(() => {
+    if (isScrolling.current) return;
     const el = containerRef.current;
     if (!el) return;
     const idx = values.findIndex(v => Math.abs(v - value) < step * 0.5);
     if (idx >= 0) el.scrollTop = idx * ITEM_H;
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Called once scrolling stops — snap to nearest item and notify parent
   const commit = useCallback(() => {
+    isScrolling.current = false;
     const el = containerRef.current;
     if (!el) return;
-    const idx = Math.round(el.scrollTop / ITEM_H);
+
+    const idx     = Math.round(el.scrollTop / ITEM_H);
     const clamped = Math.max(0, Math.min(idx, values.length - 1));
     const snapped = values[clamped];
-    if (snapped !== undefined && Math.abs(snapped - value) >= step * 0.01) {
-      onChange(snapped);
-    }
-    // Snap scroll position
+
+    // Smooth-snap the scroll position
     el.scrollTo({ top: clamped * ITEM_H, behavior: "smooth" });
-  }, [values, value, onChange, step]);
+
+    if (snapped !== undefined) onChange(snapped);
+  }, [values, onChange]);
 
   const onScroll = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(commit, 80);
+    isScrolling.current = true;
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(commit, 120);
   }, [commit]);
 
   return (
@@ -103,12 +108,12 @@ export function ScrollPicker({
                 onChange(v);
               }}
               className={cn(
-                "flex cursor-pointer items-center justify-center text-center font-semibold transition-all duration-150",
+                "flex cursor-pointer items-center justify-center text-center font-semibold transition-colors duration-100",
                 Math.abs(v - value) < step * 0.5
                   ? "text-base text-foreground"
                   : Math.abs(v - value) < step * 1.5
-                  ? "text-sm text-muted-foreground/70"
-                  : "text-xs text-muted-foreground/30"
+                  ? "text-sm text-muted-foreground/60"
+                  : "text-xs text-muted-foreground/25"
               )}
               style={{ height: ITEM_H, scrollSnapAlign: "center" }}
             >
