@@ -10,10 +10,11 @@ export default function Icon() {
         style={{
           width: 512,
           height: 512,
-          borderRadius: 104,
-          background: "#f1f1f1",
+          borderRadius: 112,
+          background: "#0d1a0f",
           display: "flex",
-          position: "relative",
+          alignItems: "center",
+          justifyContent: "center",
           overflow: "hidden",
         }}
       >
@@ -24,50 +25,15 @@ export default function Icon() {
           fill="none"
           style={{ position: "absolute", top: 0, left: 0 }}
         >
-          {/* Shift everything up by 65px to visually center the gauge */}
-          <g transform="translate(0, -65)">
-            <path d="M 66 380 A 190 190 0 0 1 147 224 L 176 265 A 140 140 0 0 0 116 380 Z" fill="#3b82f6" />
-            <path d="M 164 214 A 190 190 0 0 1 296 194 L 285 243 A 140 140 0 0 0 188 258 Z" fill="#f59e0b" />
-            <path d="M 312 198 A 190 190 0 0 1 415 275 L 373 303 A 140 140 0 0 0 297 246 Z" fill="#f97316" />
-            <path d="M 423 289 A 190 190 0 0 1 446 374 L 396 375 A 140 140 0 0 0 379 313 Z" fill="#ef4444" />
-            <g transform="translate(256,380) rotate(50)">
-              <rect x="-6" y="-125" width="12" height="172" rx="6" fill="#374151" />
-              <ellipse cx="0" cy="-148" rx="22" ry="28" fill="#374151" />
-              <circle cx="0" cy="0" r="16" fill="#4b5563" />
-              <circle cx="0" cy="0" r="7" fill="#9ca3af" />
-            </g>
-          </g>
+          <polyline
+            points="40,256 155,256 175,228 195,256 212,256 222,288 248,96 268,310 284,256 310,256 335,206 365,256 472,256"
+            stroke="#22c55e"
+            stroke-width="18"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            fill="none"
+          />
         </svg>
-        {/* E label — shifted up by 65px from original top:406 */}
-        <div
-          style={{
-            position: "absolute",
-            left: 44,
-            top: 341,
-            fontSize: 50,
-            fontWeight: 700,
-            color: "#22c55e",
-            fontFamily: "Arial, sans-serif",
-            lineHeight: 1,
-          }}
-        >
-          E
-        </div>
-        {/* F label — shifted up by 65px */}
-        <div
-          style={{
-            position: "absolute",
-            left: 421,
-            top: 341,
-            fontSize: 50,
-            fontWeight: 700,
-            color: "#ef4444",
-            fontFamily: "Arial, sans-serif",
-            lineHeight: 1,
-          }}
-        >
-          F
-        </div>
       </div>
     ),
     { ...size }
