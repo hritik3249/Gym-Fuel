@@ -1,77 +1,122 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Activity, BarChart3, Droplets, Flame, Home, Moon, Scale, Search, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { cacheSet } from "@/lib/tab-cache";
-import { getFoodsPageData, getWeightPageData, getAnalyticsPageData, getSettingsPageData } from "@/lib/actions/page-data";
+import { DashboardTab } from "@/components/tabs/dashboard-tab";
+import { FoodsTab }     from "@/components/tabs/foods-tab";
+import { AnalyticsTab } from "@/components/tabs/analytics-tab";
+import { WeightTab }    from "@/components/tabs/weight-tab";
+import { SettingsTab }  from "@/components/tabs/settings-tab";
 
-function localDateISO(): string {
-  const d = new Date();
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
-}
-
-const STATIC_NAV = [
-  { href: "/app/foods",     label: "Food",      icon: Search   },
-  { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/app/weight",    label: "Weight",    icon: Scale    },
-  { href: "/app/settings",  label: "Settings",  icon: Settings },
+const TABS = [
+  { path: "/app/dashboard", label: "Today",     icon: Home      },
+  { path: "/app/foods",     label: "Food",       icon: Search    },
+  { path: "/app/analytics", label: "Analytics",  icon: BarChart3 },
+  { path: "/app/weight",    label: "Weight",     icon: Scale     },
+  { path: "/app/settings",  label: "Settings",   icon: Settings  },
 ] as const;
 
-function NavLink({ href, label, icon: Icon, active, variant }: {
-  href: string; label: string; icon: typeof Home;
-  active: boolean; variant: "sidebar" | "tabbar";
+type TabPath = typeof TABS[number]["path"];
+const TAB_PATHS = new Set(TABS.map((t) => t.path));
+
+// Navigate without going through the Next.js router — just updates the URL
+// and flips the CSS visibility. Zero network round-trips, zero React remounts.
+function pushTab(path: string) {
+  history.pushState(null, "", path);
+  // Dispatch a custom event so the shell can react without a router re-render
+  window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+}
+
+function NavItem({
+  tab, active, variant, onNavigate,
+}: {
+  tab: typeof TABS[number];
+  active: boolean;
+  variant: "sidebar" | "tabbar";
+  onNavigate: () => void;
 }) {
+  const Icon = tab.icon;
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onNavigate();
+  };
+
   if (variant === "tabbar") {
     return (
-      <Link href={href} className={cn("flex flex-col items-center gap-1 px-2 py-2 text-[11px] font-medium text-muted-foreground", active && "text-primary")}>
+      <a
+        href={tab.path}
+        onClick={handleClick}
+        className={cn(
+          "flex flex-col items-center gap-1 px-2 py-2 text-[11px] font-medium text-muted-foreground",
+          active && "text-primary",
+        )}
+      >
         <Icon className="size-5" />
-        {label}
-      </Link>
+        {tab.label}
+      </a>
     );
   }
   return (
-    <Link href={href} className={cn("flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground", active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>
+    <a
+      href={tab.path}
+      onClick={handleClick}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+      )}
+    >
       <Icon className="size-4" />
-      {label}
-    </Link>
+      {tab.label}
+    </a>
   );
 }
 
-export function AppShell({ children, displayName, streak }: { children: React.ReactNode; displayName: string; streak: number }) {
-  const pathname = usePathname();
+export function AppShell({
+  children,
+  displayName,
+  streak,
+}: {
+  children: React.ReactNode;
+  displayName: string;
+  streak: number;
+}) {
+  const pathname = usePathname(); // used only as the initial active tab value
   const router   = useRouter();
   const { theme, setTheme } = useTheme();
 
-  // Embed local date in the dashboard href so the server receives the correct
-  // date on the first render — no DateSync redirect needed, no stale-data flash.
-  const [dashboardHref, setDashboardHref] = useState("/app/dashboard");
+  // activeTab drives CSS show/hide — updated via pushState, not Next.js router
+  const [activeTab, setActiveTab] = useState<string>(pathname);
 
+  // Sync when the browser back/forward buttons fire OR when another part of
+  // the app calls router.push/replace (e.g. onboarding redirect).
   useEffect(() => {
-    const today = localDateISO();
-    const dash  = `/app/dashboard?date=${today}`;
-    setDashboardHref(dash);
+    const sync = () => setActiveTab(window.location.pathname);
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
 
-    // Warm JS bundles for instant first navigation
-    [dash, ...STATIC_NAV.map((i) => i.href)].forEach((h) => router.prefetch(h));
+  // Keep activeTab in sync if Next.js router navigates us to a non-tab route
+  // (e.g. router.replace("/app/onboarding") from inside a tab component).
+  useEffect(() => {
+    if (!TAB_PATHS.has(pathname as TabPath)) setActiveTab(pathname);
+  }, [pathname]);
 
-    // Fetch every tab's data in parallel and store in the module-level cache.
-    // Pages read from this cache on mount → instant render, no Supabase round-trip.
-    getFoodsPageData().then((d)    => cacheSet("foods",     d));
-    getWeightPageData().then((d)   => cacheSet("weight",    d));
-    getAnalyticsPageData().then((d) => cacheSet("analytics", d));
-    getSettingsPageData().then((d) => cacheSet("settings",  d));
-  }, [router]);
+  const isTabRoute = TAB_PATHS.has(activeTab as TabPath);
 
   return (
     <div className="min-h-screen bg-background">
+      {/* ── Desktop sidebar ── */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-card/80 backdrop-blur xl:block">
         <div className="flex h-full flex-col p-4">
-          <Link href="/app/dashboard" className="flex items-center gap-3 rounded-lg px-2 py-3">
+          <a
+            href="/app/dashboard"
+            onClick={(e) => { e.preventDefault(); pushTab("/app/dashboard"); }}
+            className="flex items-center gap-3 rounded-lg px-2 py-3"
+          >
             <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Activity className="size-5" />
             </span>
@@ -79,11 +124,16 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
               <span className="block text-lg font-bold">FuelTrack</span>
               <span className="block text-xs text-muted-foreground">Nutrition OS</span>
             </span>
-          </Link>
+          </a>
           <nav className="mt-6 grid gap-1">
-            <NavLink href={dashboardHref} label="Today" icon={Home} active={pathname === "/app/dashboard"} variant="sidebar" />
-            {STATIC_NAV.map((item) => (
-              <NavLink key={item.href} {...item} active={pathname === item.href} variant="sidebar" />
+            {TABS.map((tab) => (
+              <NavItem
+                key={tab.path}
+                tab={tab}
+                active={activeTab === tab.path}
+                variant="sidebar"
+                onNavigate={() => pushTab(tab.path)}
+              />
             ))}
           </nav>
           <div className="mt-auto rounded-lg border border-border bg-background p-3">
@@ -96,15 +146,18 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
         </div>
       </aside>
 
+      {/* ── Top header ── */}
       <header className="safe-top sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur xl:ml-64">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           <div>
             <p className="text-xs font-semibold uppercase text-muted-foreground">Nutrition OS</p>
-            <h1 className="text-lg font-bold">{displayName ? `Welcome to FuelTrack, ${displayName}` : "FuelTrack"}</h1>
+            <h1 className="text-lg font-bold">
+              {displayName ? `Welcome to FuelTrack, ${displayName}` : "FuelTrack"}
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => router.push("/app/foods")}
+              onClick={() => pushTab("/app/foods")}
               className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-accent"
               aria-label="Track food"
             >
@@ -112,7 +165,12 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
               <span>{streak}</span>
               <span className="hidden text-muted-foreground sm:inline">day streak</span>
             </button>
-            <Button size="icon" variant="ghost" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Toggle theme"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>
@@ -120,14 +178,38 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
         </div>
       </header>
 
-      <main className="xl:ml-64" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 6rem)" }}>{children}</main>
+      {/* ── Main content ── */}
+      <main className="xl:ml-64" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 6rem)" }}>
+        {isTabRoute ? (
+          <>
+            {/* All 5 tabs always mounted. CSS hides inactive ones.
+                No routing, no remounts — switching is a single setState call. */}
+            <div className={cn(activeTab !== "/app/dashboard" && "hidden")}><DashboardTab /></div>
+            <div className={cn(activeTab !== "/app/foods"     && "hidden")}><FoodsTab /></div>
+            <div className={cn(activeTab !== "/app/analytics" && "hidden")}><AnalyticsTab /></div>
+            <div className={cn(activeTab !== "/app/weight"    && "hidden")}><WeightTab /></div>
+            <div className={cn(activeTab !== "/app/settings"  && "hidden")}><SettingsTab /></div>
+          </>
+        ) : (
+          // Non-tab routes (onboarding, etc.) render normally as children
+          children
+        )}
+      </main>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur xl:hidden">
-        <NavLink href={dashboardHref} label="Today" icon={Home} active={pathname === "/app/dashboard"} variant="tabbar" />
-        {STATIC_NAV.map((item) => (
-          <NavLink key={item.href} {...item} active={pathname === item.href} variant="tabbar" />
-        ))}
-      </nav>
+      {/* ── Mobile tab bar ── */}
+      {isTabRoute && (
+        <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur xl:hidden">
+          {TABS.map((tab) => (
+            <NavItem
+              key={tab.path}
+              tab={tab}
+              active={activeTab === tab.path}
+              variant="tabbar"
+              onNavigate={() => pushTab(tab.path)}
+            />
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
