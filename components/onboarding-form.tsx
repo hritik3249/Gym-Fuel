@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Activity, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollPicker } from "@/components/ui/scroll-picker";
 import { saveProfile } from "@/lib/actions/profile";
 import { calculateGoals } from "@/lib/calculator";
+import { createClient } from "@/lib/supabase/browser";
 import type { ActivityLevel, CalculatedGoals, FitnessGoal, Gender } from "@/lib/calculator";
 import { cn } from "@/lib/utils";
 
@@ -60,9 +62,23 @@ function StepShell({ children, title, subtitle }: { children: React.ReactNode; t
 
 /* ── Main component ───────────────────────────────── */
 export function OnboardingForm() {
+  const router = useRouter();
   const [step, setStep]               = useState(0);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
+
+  // If the user is already onboarded (completed in another tab, or navigated
+  // here directly after setup), kick them to the dashboard immediately.
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("profiles")
+      .select("age")
+      .single()
+      .then(({ data }) => {
+        if (data?.age) router.replace("/app/dashboard");
+      });
+  }, [router]);
 
   // Fields
   const [displayName, setDisplayName] = useState("");
