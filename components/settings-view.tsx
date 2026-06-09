@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollPicker } from "@/components/ui/scroll-picker";
 import { nutrientTargets } from "@/lib/nutrition";
 import { saveProfile } from "@/lib/actions/profile";
 import { saveGoals } from "@/lib/actions/goals";
@@ -29,14 +30,14 @@ const GOAL_OPTIONS: Array<{ value: FitnessGoal; label: string }> = [
   { value: "gain", label: "💪 Gain muscle" }
 ];
 
-const GOAL_FIELDS = [
-  ["calories", "Calories", "kcal"],
-  ["protein", "Protein", "g"],
-  ["carbs", "Carbs", "g"],
-  ["fat", "Fat", "g"],
-  ["waterMl", "Water", "ml"],
-  ["targetWeightKg", "Target weight", "kg"]
-] as const satisfies ReadonlyArray<readonly [keyof Goal, string, string]>;
+const GOAL_PICKERS = [
+  { key: "calories"       as keyof Goal, label: "Calories",      unit: "kcal", min: 500,  max: 6000, step: 50  },
+  { key: "protein"        as keyof Goal, label: "Protein",        unit: "g",    min: 20,   max: 400,  step: 1   },
+  { key: "carbs"          as keyof Goal, label: "Carbs",          unit: "g",    min: 20,   max: 600,  step: 1   },
+  { key: "fat"            as keyof Goal, label: "Fat",            unit: "g",    min: 10,   max: 200,  step: 1   },
+  { key: "waterMl"        as keyof Goal, label: "Water",          unit: "ml",   min: 500,  max: 5000, step: 250 },
+  { key: "targetWeightKg" as keyof Goal, label: "Target weight",  unit: "kg",   min: 30,   max: 200,  step: 0.5 },
+] as const;
 
 const REMINDER_ITEMS = ["Breakfast log reminder", "Evening hydration check", "Weekly report summary"];
 
@@ -289,29 +290,29 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSaveGoals} className="grid gap-4 sm:grid-cols-2">
-            {GOAL_FIELDS.map(([key, label, unit]) => (
-              <div key={key} className="grid gap-2">
-                <Label htmlFor={`goal-${key}`}>{label}</Label>
-                <div className="flex rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring">
-                  <Input
-                    id={`goal-${key}`}
-                    name={key}
-                    className="border-0 focus-visible:ring-0"
-                    value={goals[key]}
-                    onChange={(e) => setGoals((current) => ({ ...current, [key]: Number(e.target.value || 0) }))}
-                    inputMode="decimal"
+          <form onSubmit={handleSaveGoals} className="grid gap-6">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3">
+              {GOAL_PICKERS.map(({ key, label, unit, min, max, step }) => (
+                <div key={key} className="flex flex-col items-center gap-1">
+                  <ScrollPicker
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={Number(goals[key])}
+                    onChange={(v) => setGoals((g) => ({ ...g, [key]: v }))}
+                    label={label}
+                    unit={unit}
                   />
-                  <span className="flex items-center px-3 text-sm text-muted-foreground">{unit}</span>
+                  <input type="hidden" name={key} value={Number(goals[key])} />
                 </div>
-              </div>
-            ))}
-            <div className="flex items-center gap-3 sm:col-span-2">
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
               <Button type="submit" disabled={goalsPending}>
                 {goalsPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Save goals
               </Button>
-              {goalsSaved && <p className="text-sm font-medium text-emerald-600">Saved!</p>}
+              {goalsSaved && <p className="text-sm font-medium text-primary">Saved!</p>}
             </div>
           </form>
         </CardContent>

@@ -58,4 +58,11 @@
   .surface-glass {
     @apply border border-white/40 bg-white/65 shadow-soft backdrop-blur-xl dark:border-white/[0.06] dark:bg-white/[0.03];
   }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }

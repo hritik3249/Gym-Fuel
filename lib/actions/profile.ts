@@ -19,12 +19,16 @@ export async function saveProfile(formData: FormData) {
   const activityLevel = formData.get("activityLevel") as ActivityLevel;
   const fitnessGoal = formData.get("fitnessGoal") as FitnessGoal;
   const displayName = (formData.get("displayName") as string | null)?.trim() || null;
+  const targetWeightKgOverride = formData.get("targetWeightKg") ? Number(formData.get("targetWeightKg")) : null;
 
   if (!age || !gender || !heightCm || !weightKg || !activityLevel || !fitnessGoal) {
     return { error: "All fields are required." };
   }
 
   const calculated = calculateGoals({ age, gender, heightCm, weightKg, activityLevel, goal: fitnessGoal });
+  if (targetWeightKgOverride && targetWeightKgOverride > 0) {
+    calculated.targetWeightKg = targetWeightKgOverride;
+  }
   const updatedAt = new Date().toISOString();
 
   const { error: profileError } = await supabase
