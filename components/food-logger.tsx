@@ -75,24 +75,35 @@ function matchesSearch(food: Food, term: string) {
 export type FoodLoggerProps = {
   foods: Food[];
   initialEntries: FoodEntry[];
+  /** The UTC date the server used to load initialEntries (YYYY-MM-DD).
+   *  When this differs from the client's local date, we know the server
+   *  returned the wrong day (IST midnight edge case) and must refetch. */
+  serverDate: string;
 };
 
-export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
+export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProps) {
   useRealtimeRefresh(["foods", "saved_foods", "food_entries"]);
 
   // ── Date state ─────────────────────────────────────────────────────────────
   // todayDate is determined once on the CLIENT (local timezone), not server UTC.
-  const [todayDate]  = useState<string>(localDateISO);
+  const [todayDate] = useState<string>(localDateISO);
   const [viewDate, setViewDate] = useState<string>(todayDate);
   const isToday = viewDate === todayDate;
 
   // ── Entry state ────────────────────────────────────────────────────────────
-  const [entries, setEntries]         = useState<FoodEntry[]>(initialEntries);
-  const [loadingDate, setLoadingDate] = useState(false);
+  // If the server's UTC date already matches the client's local date, the
+  // initialEntries are correct — use them immediately with no extra fetch.
+  // Only refetch when the client navigates to a different date OR when there
+  // is a timezone mismatch (e.g. after midnight IST but before midnight UTC).
+  const datesMismatch = serverDate !== todayDate;
+  const [entries, setEntries]         = useState<FoodEntry[]>(datesMismatch ? [] : initialEntries);
+  const [loadingDate, setLoadingDate] = useState(datesMismatch);
 
-  // On mount + whenever viewDate changes: fetch the correct entries.
-  // This also fixes the UTC/IST timezone mismatch on first load.
   useEffect(() => {
+    // Normal case: serverDate === todayDate → initialEntries already correct,
+    // no fetch needed unless the user navigates away from today.
+    if (viewDate === todayDate && !datesMismatch) return;
+
     let cancelled = false;
     setLoadingDate(true);
     getFoodEntriesForDate(viewDate).then(({ entries: fetched }) => {
@@ -102,6 +113,7 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
       }
     });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate]);
 
   // ── Search state ───────────────────────────────────────────────────────────

@@ -169,26 +169,23 @@ async function requireSession() {
   return { supabase, user, isNewUser };
 }
 
-export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; isNewUser: boolean };
+export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; serverDate: string; isNewUser: boolean };
 
-/** Lighter-weight fetch for the food logger page — skips goals, water, weight, streak, and trend data. */
+/** Lighter-weight fetch for the food logger page — skips goals, water, weight, streak, and trend data.
+ *  Also returns serverDate (UTC YYYY-MM-DD) so the client can detect timezone mismatches. */
 export async function getFoodsPageData(): Promise<FoodsPageData> {
   const session = await requireSession();
-  if (!session) return { foods: [], entries: [], isNewUser: true };
+  const serverDate = todayISO();
+  if (!session) return { foods: [], entries: [], serverDate, isNewUser: true };
   const { supabase, user, isNewUser } = session;
-  if (isNewUser) return { foods: [], entries: [], isNewUser };
-
-  const today = todayISO();
-  const dayStart = `${today}T00:00:00`;
-  const dayEnd = `${today}T23:59:59`;
+  if (isNewUser) return { foods: [], entries: [], serverDate, isNewUser };
 
   const [entriesRes, foodsRes] = await Promise.all([
     supabase
       .from("food_entries")
       .select("*")
       .eq("user_id", user.id)
-      .gte("logged_at", dayStart)
-      .lte("logged_at", dayEnd)
+      .eq("entry_date", serverDate)           // use entry_date index — fast
       .order("logged_at", { ascending: false }),
     supabase
       .from("foods")
@@ -201,6 +198,7 @@ export async function getFoodsPageData(): Promise<FoodsPageData> {
   return {
     foods: (foodsRes.data ?? []).map(mapFood),
     entries: (entriesRes.data ?? []).map(mapEntry),
+    serverDate,
     isNewUser
   };
 }

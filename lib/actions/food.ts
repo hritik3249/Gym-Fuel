@@ -133,8 +133,8 @@ export async function deleteFoodEntry(id: string) {
   return { success: true };
 }
 
-/** Fetch all food entries for a specific local calendar date. Handles both new rows
- *  (with entry_date set) and legacy rows (backfilled from logged_at UTC). */
+/** Fetch all food entries for a specific local calendar date.
+ *  Migration 011 backfilled entry_date for all rows, so a single indexed lookup suffices. */
 export async function getFoodEntriesForDate(date: string): Promise<{ entries: FoodEntry[] }> {
   const supabase = await createClient();
   const {
@@ -142,32 +142,14 @@ export async function getFoodEntriesForDate(date: string): Promise<{ entries: Fo
   } = await supabase.auth.getUser();
   if (!user) return { entries: [] };
 
-  const dayStart = `${date}T00:00:00`;
-  const dayEnd   = `${date}T23:59:59`;
+  const { data } = await supabase
+    .from("food_entries")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("entry_date", date)
+    .order("logged_at", { ascending: false });
 
-  // Primary: entry_date match (new rows with local date).
-  // Fallback: timestamp range (legacy rows where entry_date was backfilled as UTC).
-  const [{ data: primary }, { data: legacy }] = await Promise.all([
-    supabase
-      .from("food_entries")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("entry_date", date)
-      .order("logged_at", { ascending: false }),
-    supabase
-      .from("food_entries")
-      .select("*")
-      .eq("user_id", user.id)
-      .is("entry_date", null)
-      .gte("logged_at", dayStart)
-      .lte("logged_at", dayEnd)
-      .order("logged_at", { ascending: false }),
-  ]);
-
-  const combined = [...(primary ?? []), ...(legacy ?? [])];
-  combined.sort((a, b) => b.logged_at.localeCompare(a.logged_at));
-
-  return { entries: combined.map(mapFoodEntry) };
+  return { entries: (data ?? []).map(mapFoodEntry) };
 }
 
 type CustomFoodInput = Nutrients & {
