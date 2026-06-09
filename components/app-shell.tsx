@@ -2,26 +2,27 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Activity, BarChart3, Droplets, Flame, Home, Moon, Scale, Search, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
-  { href: "/app/dashboard", label: "Today", icon: Home },
-  { href: "/app/foods", label: "Food", icon: Search },
+function localDateISO(): string {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+}
+
+const STATIC_NAV = [
+  { href: "/app/foods",     label: "Food",      icon: Search   },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/app/weight", label: "Weight", icon: Scale },
-  { href: "/app/settings", label: "Settings", icon: Settings }
+  { href: "/app/weight",    label: "Weight",    icon: Scale    },
+  { href: "/app/settings",  label: "Settings",  icon: Settings },
 ] as const;
 
 function NavLink({ href, label, icon: Icon, active, variant }: {
-  href: string;
-  label: string;
-  icon: typeof Home;
-  active: boolean;
-  variant: "sidebar" | "tabbar";
+  href: string; label: string; icon: typeof Home;
+  active: boolean; variant: "sidebar" | "tabbar";
 }) {
   if (variant === "tabbar") {
     return (
@@ -31,15 +32,8 @@ function NavLink({ href, label, icon: Icon, active, variant }: {
       </Link>
     );
   }
-
   return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-        active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-      )}
-    >
+    <Link href={href} className={cn("flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground", active && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>
       <Icon className="size-4" />
       {label}
     </Link>
@@ -48,13 +42,21 @@ function NavLink({ href, label, icon: Icon, active, variant }: {
 
 export function AppShell({ children, displayName, streak }: { children: React.ReactNode; displayName: string; streak: number }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router   = useRouter();
   const { theme, setTheme } = useTheme();
 
-  // Warm every section's route segment + instant-loading skeleton up front, so tapping
-  // a tab feels immediate instead of waiting on the chunk to load on first visit.
+  // Embed local date in the dashboard href so the server receives the correct
+  // date on the first render — no DateSync redirect needed, no stale-data flash.
+  const [dashboardHref, setDashboardHref] = useState("/app/dashboard");
+
   useEffect(() => {
-    for (const item of NAV_ITEMS) router.prefetch(item.href);
+    const today = localDateISO();
+    const href  = `/app/dashboard?date=${today}`;
+    setDashboardHref(href);
+
+    // Prefetch all tabs with the correct date so first-visit loads are instant too.
+    router.prefetch(href);
+    for (const item of STATIC_NAV) router.prefetch(item.href);
   }, [router]);
 
   return (
@@ -71,7 +73,8 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
             </span>
           </Link>
           <nav className="mt-6 grid gap-1">
-            {NAV_ITEMS.map((item) => (
+            <NavLink href={dashboardHref} label="Today" icon={Home} active={pathname === "/app/dashboard"} variant="sidebar" />
+            {STATIC_NAV.map((item) => (
               <NavLink key={item.href} {...item} active={pathname === item.href} variant="sidebar" />
             ))}
           </nav>
@@ -112,7 +115,8 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
       <main className="xl:ml-64" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 6rem)" }}>{children}</main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur xl:hidden">
-        {NAV_ITEMS.map((item) => (
+        <NavLink href={dashboardHref} label="Today" icon={Home} active={pathname === "/app/dashboard"} variant="tabbar" />
+        {STATIC_NAV.map((item) => (
           <NavLink key={item.href} {...item} active={pathname === item.href} variant="tabbar" />
         ))}
       </nav>
