@@ -11,7 +11,7 @@ export default function Icon() {
           width: 512,
           height: 512,
           borderRadius: 112,
-          background: "#0d1a0f",
+          background: "#22c55e",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -19,20 +19,16 @@ export default function Icon() {
         }}
       >
         <svg
-          width="512"
-          height="512"
-          viewBox="0 0 512 512"
+          width="352"
+          height="352"
+          viewBox="0 0 24 24"
           fill="none"
-          style={{ position: "absolute", top: 0, left: 0 }}
+          stroke="white"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <polyline
-            points="40,256 155,256 175,228 195,256 212,256 222,288 248,96 268,310 284,256 310,256 335,206 365,256 472,256"
-            stroke="#22c55e"
-            stroke-width="18"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            fill="none"
-          />
+          <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
         </svg>
       </div>
     ),
