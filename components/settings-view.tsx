@@ -1,7 +1,8 @@
 "use client";
 
 import { Bell, Calculator, Loader2, LogOut, Save, User } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +78,8 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
   const [profileError, setProfileError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
   const [activePicker, setActivePicker] = useState<typeof GOAL_PICKERS[number] | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   function updateProfile<K extends keyof SettingsProfile>(field: K, value: SettingsProfile[K]) {
     setProfile((current) => ({ ...current, [field]: value }));
@@ -140,7 +143,8 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
   }
 
   return (
-    <div className="container grid gap-4 py-4 sm:py-6">
+    <>
+    <div className={`container grid gap-4 py-4 sm:py-6 ${activePicker ? "pointer-events-none select-none" : ""}`}>
       <section className="surface-glass rounded-lg p-4 sm:p-6">
         <p className="text-sm font-semibold text-primary">Settings</p>
         <h2 className="mt-1 text-3xl font-bold tracking-tight">Personalize FuelTrack</h2>
@@ -325,19 +329,6 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
             </div>
           </form>
 
-          {/* Scroll picker modal */}
-          {activePicker && (
-            <ScrollPickerModal
-              label={activePicker.label}
-              unit={activePicker.unit}
-              min={activePicker.min}
-              max={activePicker.max}
-              step={activePicker.step}
-              value={Number(goals[activePicker.key])}
-              onConfirm={(v) => setGoals((g) => ({ ...g, [activePicker.key]: v }))}
-              onClose={() => setActivePicker(null)}
-            />
-          )}
         </CardContent>
       </Card>
 
@@ -377,5 +368,22 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
         </Card>
       </section>
     </div>
+
+    {/* Portal: renders directly on document.body — completely outside the
+        pointer-events-none wrapper, no stacking context conflicts */}
+    {mounted && activePicker && createPortal(
+      <ScrollPickerModal
+        label={activePicker.label}
+        unit={activePicker.unit}
+        min={activePicker.min}
+        max={activePicker.max}
+        step={activePicker.step}
+        value={Number(goals[activePicker.key])}
+        onConfirm={(v) => setGoals((g) => ({ ...g, [activePicker.key]: v }))}
+        onClose={() => setActivePicker(null)}
+      />,
+      document.body
+    )}
+    </>
   );
 }
