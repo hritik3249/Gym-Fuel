@@ -7,16 +7,20 @@ export const metadata: Metadata = {
   title: "FuelTrack",
   description: "Nutrition, calorie, micronutrient, hydration, and weight tracking.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "FuelTrack", statusBarStyle: "default" }
+  // black-translucent: status bar overlays the app (true full-screen).
+  // Content must compensate with env(safe-area-inset-top) padding.
+  appleWebApp: { capable: true, title: "FuelTrack", statusBarStyle: "black-translucent" }
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1720" }
+    { media: "(prefers-color-scheme: light)", color: "#fef9ec" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" }
   ],
   width: "device-width",
-  initialScale: 1
+  initialScale: 1,
+  // viewportFit=cover lets content extend into notch / dynamic island areas
+  viewportFit: "cover"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

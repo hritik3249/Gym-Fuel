@@ -66,6 +66,8 @@ export function OnboardingForm({ defaultName = "" }: { defaultName?: string }) {
 
   // Fields
   const [displayName, setDisplayName] = useState(defaultName);
+  // buttonName only updates on blur so the button text doesn't flicker with every keystroke
+  const [buttonName, setButtonName]   = useState(defaultName);
   const [age,         setAge]         = useState(25);
   const [gender,      setGender]      = useState<Gender>("male");
   const [heightCm,    setHeightCm]    = useState(170);
@@ -135,9 +137,15 @@ export function OnboardingForm({ defaultName = "" }: { defaultName?: string }) {
               autoFocus
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
+              onBlur={() => setButtonName(displayName.trim())}
               placeholder="e.g. Hritik"
               className="h-12 text-base"
-              onKeyDown={(e) => e.key === "Enter" && canNext && next()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canNext) {
+                  setButtonName(displayName.trim());
+                  next();
+                }
+              }}
             />
           </StepShell>
         )}
@@ -280,8 +288,8 @@ export function OnboardingForm({ defaultName = "" }: { defaultName?: string }) {
           )}
 
           {step < TOTAL_STEPS - 1 ? (
-            <Button onClick={next} disabled={!canNext} className="gap-2">
-              {step === 0 ? `Let's go, ${displayName || "..."}` : "Continue"}
+            <Button onClick={() => { setButtonName(displayName.trim()); next(); }} disabled={!canNext} className="gap-2">
+              {step === 0 ? (buttonName ? `Let's go, ${buttonName}` : "Let's go") : "Continue"}
               <ChevronRight className="size-4" />
             </Button>
           ) : (

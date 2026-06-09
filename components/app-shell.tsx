@@ -85,7 +85,7 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
         </div>
       </aside>
 
-      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur xl:ml-64">
+      <header className="safe-top sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur xl:ml-64">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           <div>
             <p className="text-xs font-semibold uppercase text-muted-foreground">Nutrition OS</p>
@@ -109,9 +109,9 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
         </div>
       </header>
 
-      <main className="pb-24 xl:ml-64">{children}</main>
+      <main className="xl:ml-64" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 6rem)" }}>{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur xl:hidden">
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-background/95 backdrop-blur xl:hidden">
         {NAV_ITEMS.map((item) => (
           <NavLink key={item.href} {...item} active={pathname === item.href} variant="tabbar" />
         ))}
