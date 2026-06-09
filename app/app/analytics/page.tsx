@@ -6,5 +6,5 @@ export default async function AnalyticsPage() {
   const data = await getAnalyticsPageData();
   if (data.isNewUser) redirect("/app/onboarding");
 
-  return <AnalyticsView trends={data.trends} achievements={data.achievements} />;
+  return <AnalyticsView trends={data.trends} achievements={data.achievements} goals={data.goals} />;
 }

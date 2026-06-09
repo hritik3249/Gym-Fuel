@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "icon-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "-l", "4323", "C:/Users/hriti/icon-preview"],
+      "port": 4323
+    }
+  ]
+}

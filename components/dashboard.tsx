@@ -243,24 +243,51 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
       </section>
 
       <section className="grid gap-4 md:grid-cols-3 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500 ease-out fill-mode-both">
-        {[
-          ["Weekly adherence", "—", "Log 7 days to see"],
-          ["Avg protein", totals.protein > 0 ? `${formatNumber(totals.protein, 0)}g` : "—", "Today's protein"],
-          ["Weight change", "—", "Log weight to track"]
-        ].map(([title, value, detail]) => (
-          <Card key={title}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{title}</p>
-                  <p className="mt-1 text-3xl font-bold">{value}</p>
+        {(() => {
+          const caloriesLeft = goals.calories - totals.calories;
+          const caloriesOver = caloriesLeft < 0;
+          const weekAgoWeight = weights.length >= 7 ? weights.at(-7) : weights.at(0);
+          const latestWeight = weights.at(-1);
+          const weightDelta =
+            latestWeight && weekAgoWeight && latestWeight.id !== weekAgoWeight.id
+              ? (latestWeight.weightKg - weekAgoWeight.weightKg).toFixed(1)
+              : null;
+          const proteinPct = goals.protein > 0 ? Math.round((totals.protein / goals.protein) * 100) : 0;
+
+          return [
+            {
+              title: caloriesOver ? "Calories over" : "Calories left",
+              value: `${Math.abs(Math.round(caloriesLeft))} kcal`,
+              detail: caloriesOver ? "Over today's goal" : "Remaining today",
+              highlight: caloriesOver
+            },
+            {
+              title: "Protein today",
+              value: totals.protein > 0 ? `${formatNumber(totals.protein, 0)}g` : "—",
+              detail: goals.protein > 0 ? `${proteinPct}% of ${goals.protein}g goal` : "Log meals to track",
+              highlight: false
+            },
+            {
+              title: "Weight change",
+              value: weightDelta != null ? `${Number(weightDelta) > 0 ? "+" : ""}${weightDelta}kg` : "—",
+              detail: weightDelta != null ? "vs. 7 days ago" : "Log weight to track",
+              highlight: false
+            }
+          ].map(({ title, value, detail, highlight }) => (
+            <Card key={title}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{title}</p>
+                    <p className={`mt-1 text-3xl font-bold ${highlight ? "text-rose-500" : ""}`}>{value}</p>
+                  </div>
+                  <Award className="size-8 text-primary" />
                 </div>
-                <Award className="size-8 text-primary" />
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">{detail}</p>
-            </CardContent>
-          </Card>
-        ))}
+                <p className="mt-2 text-sm text-muted-foreground">{detail}</p>
+              </CardContent>
+            </Card>
+          ));
+        })()}
       </section>
     </div>
   );

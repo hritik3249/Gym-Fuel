@@ -204,24 +204,65 @@ export async function getWeightPageData(): Promise<WeightPageData> {
   return { weightLogs: (data ?? []).map(mapWeightLog).reverse(), isNewUser };
 }
 
-export type AnalyticsPageData = { trends: DailyTrend[]; achievements: Achievement[]; isNewUser: boolean };
+export type AnalyticsPageData = { trends: DailyTrend[]; achievements: Achievement[]; goals: Goal; isNewUser: boolean };
 
-/** Lighter-weight fetch for the analytics page — trend frame plus achievements (currently placeholder). */
+/** Fetches real 14-day food entries, weight logs, and goals to populate the analytics page. */
 export async function getAnalyticsPageData(): Promise<AnalyticsPageData> {
   const session = await requireSession();
-  if (!session) return { trends: [], achievements: [], isNewUser: true };
+  if (!session) return { trends: [], achievements: [], goals: defaultGoals, isNewUser: true };
   const { supabase, user, isNewUser } = session;
-  if (isNewUser) return { trends: [], achievements: [], isNewUser };
+  if (isNewUser) return { trends: [], achievements: [], goals: defaultGoals, isNewUser };
 
-  const { data } = await supabase
-    .from("weight_logs")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("logged_at", { ascending: false })
-    .limit(RECENT_WEIGHT_LOGS);
+  const trendStart = subDays(new Date(), TREND_DAYS - 1).toISOString().slice(0, 10);
 
-  const weightLogs = (data ?? []).map(mapWeightLog).reverse();
-  return { trends: buildTrendFrame(weightLogs), achievements: [], isNewUser };
+  const [weightRes, entriesRes, goalsRes] = await Promise.all([
+    supabase.from("weight_logs").select("*").eq("user_id", user.id).order("logged_at", { ascending: true }).limit(RECENT_WEIGHT_LOGS),
+    supabase.from("food_entries").select("*").eq("user_id", user.id).gte("logged_at", `${trendStart}T00:00:00`).order("logged_at"),
+    supabase.from("goals").select("*").eq("user_id", user.id).single()
+  ]);
+
+  const weightLogs = (weightRes.data ?? []).map(mapWeightLog);
+  const entries = (entriesRes.data ?? []).map(mapEntry);
+  const goals = mapGoals(goalsRes.data);
+
+  // Build 14-day frame then fill in real nutrition data from entries
+  const trends = buildTrendFrame(weightLogs);
+  for (const entry of entries) {
+    const date = entry.loggedAt.slice(5, 10);
+    const trend = trends.find((t) => t.date === date);
+    if (trend) {
+      trend.calories += entry.calories;
+      trend.protein += entry.protein;
+      trend.carbs += entry.carbs;
+      trend.fat += entry.fat;
+      trend.iron += entry.iron;
+      trend.calcium += entry.calcium;
+      trend.magnesium += entry.magnesium;
+    }
+  }
+
+  // Adherence = % of calorie goal hit that day (capped at 100)
+  for (const trend of trends) {
+    trend.adherence = goals.calories > 0 ? Math.min(100, Math.round((trend.calories / goals.calories) * 100)) : 0;
+  }
+
+  // Build real achievements from trend data
+  const loggedDays = trends.filter((t) => t.calories > 0).length;
+  const proteinDays = trends.filter((t) => goals.protein > 0 && t.protein >= goals.protein).length;
+  let bestStreak = 0;
+  let currentStreak = 0;
+  for (const trend of trends) {
+    if (trend.calories > 0) { currentStreak++; bestStreak = Math.max(bestStreak, currentStreak); }
+    else { currentStreak = 0; }
+  }
+
+  const achievements: Achievement[] = [
+    { id: "logging", title: "Consistent Logger", description: "Days tracked in the last 14 days", progress: loggedDays, target: 14 },
+    { id: "protein", title: "Protein Target", description: `Days hitting protein goal (${goals.protein}g)`, progress: proteinDays, target: 14 },
+    { id: "streak", title: "Best Streak", description: "Consecutive days logged in this period", progress: bestStreak, target: 7 }
+  ];
+
+  return { trends, achievements, goals, isNewUser };
 }
 
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
