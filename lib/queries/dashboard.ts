@@ -283,7 +283,9 @@ export async function getAnalyticsPageData(): Promise<AnalyticsPageData> {
   return { trends, achievements, goals, isNewUser };
 }
 
-export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
+/** Pass `date` (YYYY-MM-DD) from the client so the snapshot uses the user's
+ *  local calendar day instead of the server's UTC date. */
+export async function getDashboardSnapshot(date?: string): Promise<DashboardSnapshot> {
   const supabase = await createClient();
   const {
     data: { user }
@@ -291,9 +293,10 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
 
   if (!user) return emptySnapshot();
 
-  const today = todayISO();
+  // Prefer the client-supplied local date; fall back to UTC today on first load.
+  const today    = date ?? todayISO();
   const dayStart = `${today}T00:00:00`;
-  const dayEnd = `${today}T23:59:59`;
+  const dayEnd   = `${today}T23:59:59`;
 
   const [goalsRes, entriesRes, waterRes, weightRes, foodsRes, streakRes, profileRes] = await Promise.all([
     supabase.from("goals").select("*").eq("user_id", user.id).single(),
@@ -301,8 +304,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       .from("food_entries")
       .select("*")
       .eq("user_id", user.id)
-      .gte("logged_at", dayStart)
-      .lte("logged_at", dayEnd)
+      .eq("entry_date", today)                 // indexed — much faster than gte/lte
       .order("logged_at", { ascending: false }),
     supabase.from("water_logs").select("*").eq("user_id", user.id).gte("logged_at", dayStart).lte("logged_at", dayEnd),
     supabase.from("weight_logs").select("*").eq("user_id", user.id).order("logged_at", { ascending: false }).limit(RECENT_WEIGHT_LOGS),
