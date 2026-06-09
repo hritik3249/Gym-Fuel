@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollPicker } from "@/components/ui/scroll-picker";
+import { ScrollPickerModal } from "@/components/ui/scroll-picker-modal";
 import { nutrientTargets } from "@/lib/nutrition";
 import { saveProfile } from "@/lib/actions/profile";
 import { saveGoals } from "@/lib/actions/goals";
@@ -76,6 +76,7 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
   const [goalsSaved, setGoalsSaved] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [activePicker, setActivePicker] = useState<typeof GOAL_PICKERS[number] | null>(null);
 
   function updateProfile<K extends keyof SettingsProfile>(field: K, value: SettingsProfile[K]) {
     setProfile((current) => ({ ...current, [field]: value }));
@@ -290,22 +291,29 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSaveGoals} className="grid gap-6">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3">
-              {GOAL_PICKERS.map(({ key, label, unit, min, max, step }) => (
-                <div key={key} className="flex flex-col items-center gap-1">
-                  <ScrollPicker
-                    min={min}
-                    max={max}
-                    step={step}
-                    value={Number(goals[key])}
-                    onChange={(v) => setGoals((g) => ({ ...g, [key]: v }))}
-                    label={label}
-                    unit={unit}
-                  />
-                  <input type="hidden" name={key} value={Number(goals[key])} />
-                </div>
-              ))}
+          <form onSubmit={handleSaveGoals} className="grid gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {GOAL_PICKERS.map((picker) => {
+                const { key, label, unit, step } = picker;
+                const val = Number(goals[key]);
+                const display = step < 1 ? val.toFixed(1) : String(Math.round(val));
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActivePicker(picker)}
+                    className="group flex flex-col items-start rounded-xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-primary/5"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-2xl font-bold group-hover:text-primary">
+                      {display}
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">{unit}</span>
+                    </p>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground/60">Tap to edit</p>
+                    <input type="hidden" name={key} value={val} />
+                  </button>
+                );
+              })}
             </div>
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={goalsPending}>
@@ -315,6 +323,20 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
               {goalsSaved && <p className="text-sm font-medium text-primary">Saved!</p>}
             </div>
           </form>
+
+          {/* Scroll picker modal */}
+          {activePicker && (
+            <ScrollPickerModal
+              label={activePicker.label}
+              unit={activePicker.unit}
+              min={activePicker.min}
+              max={activePicker.max}
+              step={activePicker.step}
+              value={Number(goals[activePicker.key])}
+              onConfirm={(v) => setGoals((g) => ({ ...g, [activePicker.key]: v }))}
+              onClose={() => setActivePicker(null)}
+            />
+          )}
         </CardContent>
       </Card>
 
