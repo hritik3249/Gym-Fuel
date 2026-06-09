@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Activity, BarChart3, Droplets, Home, Moon, Plus, Scale, Search, Settings, Sun } from "lucide-react";
+import { Activity, BarChart3, Droplets, Flame, Home, Moon, Scale, Search, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ function NavLink({ href, label, icon: Icon, active, variant }: {
   );
 }
 
-export function AppShell({ children, displayName }: { children: React.ReactNode; displayName: string }) {
+export function AppShell({ children, displayName, streak }: { children: React.ReactNode; displayName: string; streak: number }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -92,9 +92,15 @@ export function AppShell({ children, displayName }: { children: React.ReactNode;
             <h1 className="text-lg font-bold">{displayName ? `Welcome to FuelTrack, ${displayName}` : "FuelTrack"}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="icon" variant="outline" aria-label="Quick add food" onClick={() => router.push("/app/foods")}>
-              <Plus className="size-4" />
-            </Button>
+            <button
+              onClick={() => router.push("/app/foods")}
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-accent"
+              aria-label="Track food"
+            >
+              <Flame className="size-4 text-orange-500" />
+              <span>{streak}</span>
+              <span className="hidden text-muted-foreground sm:inline">day streak</span>
+            </button>
             <Button size="icon" variant="ghost" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
               <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />

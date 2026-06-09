@@ -24,10 +24,11 @@ export type ProgressRingProps = {
 export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: ProgressRingProps) {
   const percent = goal ? Math.min(value / goal, 1) : 0;
   const offset = CIRCUMFERENCE - percent * CIRCUMFERENCE;
+  const remaining = Math.max(goal - value, 0);
 
   return (
     <div className="flex items-center gap-3">
-      <div className="group relative size-24 shrink-0 cursor-default transition-transform duration-200 ease-out hover:scale-105 active:scale-95">
+      <div className="group relative size-20 shrink-0 cursor-default transition-transform duration-200 ease-out hover:scale-105 active:scale-95">
         <svg className="-rotate-90" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r={RADIUS} className="stroke-muted" strokeWidth="10" fill="none" />
           <circle
@@ -43,17 +44,21 @@ export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: Pro
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-bold">{Math.round(percent * 100)}%</span>
-          <span className="text-[11px] text-muted-foreground">{unit}</span>
+          <span className="text-base font-bold leading-none">{Math.round(percent * 100)}%</span>
+          <span className="text-[10px] text-muted-foreground">{unit}</span>
         </div>
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-2xl font-bold tracking-tight">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-xl font-bold leading-tight tracking-tight">
           {formatNumber(value, unit === "kg" ? 1 : 0)}
-          <span className="text-sm font-medium text-muted-foreground"> / {formatNumber(goal)} {unit}</span>
         </p>
-        <p className="text-xs text-muted-foreground">{formatNumber(Math.max(goal - value, 0))} remaining</p>
+        <p className="text-xs text-muted-foreground">
+          / {formatNumber(goal)} {unit}
+        </p>
+        {remaining > 0 && (
+          <p className="text-[11px] text-muted-foreground/70">{formatNumber(remaining, 0)} left</p>
+        )}
       </div>
     </div>
   );

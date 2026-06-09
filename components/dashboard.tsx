@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Activity, Award, Flame, GlassWater, Loader2, Scale, Utensils } from "lucide-react";
+import { Activity, Award, ChevronRight, Flame, GlassWater, Loader2, Scale, Utensils } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ProgressRing } from "@/components/progress-ring";
@@ -90,13 +91,13 @@ export function Dashboard({ goals, totals, water, weight, entries, trends, weigh
               <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Fuel plan is {percentComplete}% complete</h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{progressMessage(percentComplete)}</p>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2">
-              <Flame className="size-5 text-orange-500" />
-              <div>
-                <p className="text-xs text-muted-foreground">Streak</p>
-                <p className="font-bold">{streak} days</p>
-              </div>
-            </div>
+            <Link
+              href="/app/foods"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Track Food
+              <ChevronRight className="size-4" />
+            </Link>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {macros.map((macro) => (
