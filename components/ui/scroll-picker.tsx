@@ -9,12 +9,10 @@ const PAD = ((VISIBLE - 1) / 2) * ITEM_H;   // 88px top/bottom pad
 
 function buildValues(min: number, max: number, step: number): number[] {
   const out: number[] = [];
-  // Use integer arithmetic to avoid floating-point drift
-  const factor = Math.round(1 / step);
-  const iMin = Math.round(min * factor);
-  const iMax = Math.round(max * factor);
-  for (let i = iMin; i <= iMax; i++) {
-    out.push(i / factor);
+  const count = Math.round((max - min) / step);
+  for (let i = 0; i <= count; i++) {
+    // Round to 3 decimal places to kill float drift (e.g. 0.1+0.2 = 0.30000…)
+    out.push(Math.round((min + i * step) * 1000) / 1000);
   }
   return out;
 }

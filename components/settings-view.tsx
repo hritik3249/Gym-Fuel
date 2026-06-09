@@ -166,7 +166,7 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
                   id="age"
                   name="age"
                   inputMode="numeric"
-                  value={profile.age}
+                  value={!profile.age || isNaN(Number(profile.age)) ? "" : profile.age}
                   onChange={(e) => updateProfile("age", e.target.value ? Number(e.target.value) : "")}
                   placeholder="e.g. 25"
                   required
@@ -195,7 +195,7 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
                   id="heightCm"
                   name="heightCm"
                   inputMode="decimal"
-                  value={profile.heightCm}
+                  value={!profile.heightCm || isNaN(Number(profile.heightCm)) ? "" : profile.heightCm}
                   onChange={(e) => updateProfile("heightCm", e.target.value ? Number(e.target.value) : "")}
                   placeholder="e.g. 175"
                   required
@@ -207,7 +207,7 @@ export function SettingsView({ goals: initialGoals, profile: initialProfile }: {
                   id="weightKg"
                   name="weightKg"
                   inputMode="decimal"
-                  value={profile.weightKg}
+                  value={!profile.weightKg || isNaN(Number(profile.weightKg)) ? "" : profile.weightKg}
                   onChange={(e) => updateProfile("weightKg", e.target.value ? Number(e.target.value) : "")}
                   placeholder="e.g. 80"
                   required
