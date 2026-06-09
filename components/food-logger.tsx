@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Globe, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
+import { Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { foodToEntry, parseServingMeasure, sumEntries } from "@/lib/nutrition";
 import type { ServingMeasure } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
-import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchExternalFoods, searchLocalFoods } from "@/lib/actions/food";
+import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchLocalFoods } from "@/lib/actions/food";
 import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
 
 const MEALS: Array<{ id: MealType; label: string }> = [
@@ -43,8 +43,8 @@ const BLANK_CUSTOM_FOOD: Omit<Food, "id" | "source"> = {
 
 const RECENT_ENTRIES_SHOWN = 4;
 const FREQUENT_FOODS_SHOWN = 5;
-const EXTERNAL_SEARCH_MIN_LENGTH = 3;
-const EXTERNAL_SEARCH_DEBOUNCE_MS = 450;
+const LOCAL_SEARCH_MIN_LENGTH = 2;
+const LOCAL_SEARCH_DEBOUNCE_MS = 150;
 
 function matchesSearch(food: Food, term: string) {
   if (!term) return true;
@@ -67,43 +67,35 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
   const [isPending, startTransition] = useTransition();
   const [savingCustom, setSavingCustom] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [externalFoods, setExternalFoods] = useState<Food[]>([]);
   const [localSearchFoods, setLocalSearchFoods] = useState<Food[]>([]);
-  const [searchingExternal, setSearchingExternal] = useState(false);
+  const [searchingLocal, setSearchingLocal] = useState(false);
   const [loggingFood, setLoggingFood] = useState<{ food: Food; measure: ServingMeasure | null } | null>(null);
   const [amountInput, setAmountInput] = useState("");
 
-  // When there's no query, show the pre-loaded recent foods. When searching,
-  // use DB search results (covers all 1 000+ seed foods, not just the initial 50).
+  // No query → show pre-loaded recent foods. Typing → DB search (all 1 000+ foods).
   const filteredFoods = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return savedFoods;
+    if (!query.trim()) return savedFoods;
     return localSearchFoods;
   }, [query, savedFoods, localSearchFoods]);
 
   useEffect(() => {
     const term = query.trim();
-    if (term.length < 2) {
+    if (term.length < LOCAL_SEARCH_MIN_LENGTH) {
       setLocalSearchFoods([]);
-      setExternalFoods([]);
-      setSearchingExternal(false);
+      setSearchingLocal(false);
       return;
     }
 
     let cancelled = false;
-    if (term.length >= EXTERNAL_SEARCH_MIN_LENGTH) setSearchingExternal(true);
+    setSearchingLocal(true);
 
     const timer = setTimeout(async () => {
-      const [localResult, externalResult] = await Promise.all([
-        searchLocalFoods(term),
-        term.length >= EXTERNAL_SEARCH_MIN_LENGTH ? searchExternalFoods(term) : Promise.resolve({ foods: [] as Food[] })
-      ]);
+      const result = await searchLocalFoods(term);
       if (!cancelled) {
-        setLocalSearchFoods(localResult.foods);
-        setExternalFoods(externalResult.foods);
-        setSearchingExternal(false);
+        setLocalSearchFoods(result.foods);
+        setSearchingLocal(false);
       }
-    }, EXTERNAL_SEARCH_DEBOUNCE_MS);
+    }, LOCAL_SEARCH_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
@@ -263,7 +255,12 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
             <CardTitle>Food Database</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {filteredFoods.length === 0 ? (
+            {searchingLocal ? (
+              <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Searching…
+              </div>
+            ) : filteredFoods.length === 0 ? (
               <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                 {query ? `No foods found for "${query}"` : "No foods yet — create a custom food to get started."}
               </p>
@@ -296,47 +293,6 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
         </Card>
 
         <div className="grid gap-4">
-          {query.trim().length >= EXTERNAL_SEARCH_MIN_LENGTH && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="size-4 text-primary" />
-                  Online results
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3">
-                {searchingExternal ? (
-                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" />
-                    Searching USDA FoodData Central for &ldquo;{query.trim()}&rdquo;...
-                  </p>
-                ) : externalFoods.length === 0 ? (
-                  <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                    No matches online for &ldquo;{query.trim()}&rdquo;.
-                  </p>
-                ) : (
-                  externalFoods.map((food) => (
-                    <div key={food.id} className="grid gap-2 rounded-lg border border-border bg-background p-3 sm:grid-cols-[1fr_auto] sm:items-center">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold">{food.name}</p>
-                          {food.brand && <span className="text-xs text-muted-foreground">{food.brand}</span>}
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {food.serving} · {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fat}g
-                        </p>
-                      </div>
-                      <Button variant="secondary" size="sm" onClick={() => startLogFood(food)} disabled={isPending}>
-                        <Plus className="size-3.5" />
-                        Log
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader>
               <CardTitle>Create Custom Food</CardTitle>
