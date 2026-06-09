@@ -141,10 +141,17 @@ function buildTrendFrame(weightLogs: WeightLog[]): DailyTrend[] {
   });
 }
 
-/** Resolves the current user and whether they've completed onboarding, via a single lightweight query.
- *  We check profiles.age because the DB trigger auto-creates a goals row for every new user
- *  (including Google OAuth), so we can't rely on goals existence. A null age means the user
- *  hasn't completed the onboarding wizard yet. */
+/** Resolves the current user and whether they've completed onboarding.
+ *
+ *  Why both checks?
+ *  - The DB trigger auto-creates a `goals` row (calories=2600 default) for every
+ *    new user, so goals-existence alone can't tell new from existing.
+ *  - But existing users who set up their account before the onboarding wizard
+ *    was added have age=NULL even though they're fully onboarded.
+ *
+ *  Solution: "new user" = age is unset AND goals are still at the trigger
+ *  default (calories=2600). Anyone who has ever saved real goals is considered
+ *  onboarded even if age is missing. */
 async function requireSession() {
   const supabase = await createClient();
   const {
@@ -153,8 +160,13 @@ async function requireSession() {
 
   if (!user) return null;
 
-  const { data: profile } = await supabase.from("profiles").select("age").eq("id", user.id).maybeSingle();
-  return { supabase, user, isNewUser: !profile?.age };
+  const [{ data: profile }, { data: goals }] = await Promise.all([
+    supabase.from("profiles").select("age").eq("id", user.id).maybeSingle(),
+    supabase.from("goals").select("calories").eq("user_id", user.id).maybeSingle(),
+  ]);
+
+  const isNewUser = !profile?.age && (!goals || Number(goals.calories) === 2600);
+  return { supabase, user, isNewUser };
 }
 
 export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; isNewUser: boolean };
@@ -306,10 +318,10 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     supabase.from("profiles").select("current_weight_kg, age, fitness_goal").eq("id", user.id).single()
   ]);
 
-  // A user is "new" until they've completed onboarding wizard (which sets their age).
-  // We can't check goals presence because the DB trigger auto-creates a goals row
-  // for every new user (including Google OAuth) with default values.
-  const isNewUser = !profileRes.data?.age;
+  // "New user" = age unset AND goals still at trigger default (calories=2600).
+  // Existing users who customised goals before the onboarding wizard existed
+  // have age=NULL but calories!=2600, so they're correctly treated as onboarded.
+  const isNewUser = !profileRes.data?.age && (!goalsRes.data || Number(goalsRes.data.calories) === 2600);
 
   const entries = (entriesRes.data ?? []).map(mapEntry);
   const waterLogs = (waterRes.data ?? []).map(mapWaterLog);
