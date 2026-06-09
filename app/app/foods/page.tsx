@@ -1,10 +1,27 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FoodLogger } from "@/components/food-logger";
-import { getFoodsPageData } from "@/lib/queries/dashboard";
+import { getFoodsPageData } from "@/lib/actions/page-data";
+import { cacheGet, cacheSet } from "@/lib/tab-cache";
+import FoodsLoading from "./loading";
+import type { FoodsPageData } from "@/lib/queries/dashboard";
 
-export default async function FoodsPage() {
-  const data = await getFoodsPageData();
-  if (data.isNewUser) redirect("/app/onboarding");
+const KEY = "foods";
 
+export default function FoodsPage() {
+  const router = useRouter();
+  const [data, setData] = useState<FoodsPageData | null>(() => cacheGet(KEY) ?? null);
+
+  useEffect(() => {
+    getFoodsPageData().then((d) => {
+      if (d.isNewUser) { router.replace("/app/onboarding"); return; }
+      cacheSet(KEY, d);
+      setData(d);
+    });
+  }, [router]);
+
+  if (!data) return <FoodsLoading />;
   return <FoodLogger foods={data.foods} initialEntries={data.entries} serverDate={data.serverDate} />;
 }

@@ -7,6 +7,8 @@ import { Activity, BarChart3, Droplets, Flame, Home, Moon, Scale, Search, Settin
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { cacheSet } from "@/lib/tab-cache";
+import { getFoodsPageData, getWeightPageData, getAnalyticsPageData, getSettingsPageData } from "@/lib/actions/page-data";
 
 function localDateISO(): string {
   const d = new Date();
@@ -54,18 +56,15 @@ export function AppShell({ children, displayName, streak }: { children: React.Re
     const dash  = `/app/dashboard?date=${today}`;
     setDashboardHref(dash);
 
-    const allHrefs = [dash, ...STATIC_NAV.map((i) => i.href)];
+    // Warm JS bundles for instant first navigation
+    [dash, ...STATIC_NAV.map((i) => i.href)].forEach((h) => router.prefetch(h));
 
-    // Prefetch = fetch + cache the full RSC payload for every tab.
-    // With staleTimes.dynamic=30 this makes every tab switch instant.
-    const prefetchAll = () => allHrefs.forEach((h) => router.prefetch(h));
-
-    prefetchAll(); // fire immediately on mount
-
-    // Re-warm every 20 s so the cache (expires at 30 s) never goes cold
-    // while the app is open. Cancelled on unmount.
-    const id = setInterval(prefetchAll, 20_000);
-    return () => clearInterval(id);
+    // Fetch every tab's data in parallel and store in the module-level cache.
+    // Pages read from this cache on mount → instant render, no Supabase round-trip.
+    getFoodsPageData().then((d)    => cacheSet("foods",     d));
+    getWeightPageData().then((d)   => cacheSet("weight",    d));
+    getAnalyticsPageData().then((d) => cacheSet("analytics", d));
+    getSettingsPageData().then((d) => cacheSet("settings",  d));
   }, [router]);
 
   return (
