@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const ITEM_H = 44;
@@ -34,18 +34,25 @@ export interface ScrollPickerProps {
 export function ScrollPicker({
   min, max, step = 1, value: rawValue, onChange, label, unit, className
 }: ScrollPickerProps) {
-  const value         = Number.isFinite(rawValue) ? rawValue : min;
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const isUserScroll  = useRef(false);   // true only during real user scroll
-  const isProgrammatic = useRef(false);  // true when WE set scrollTop
-  const commitTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const value          = Number.isFinite(rawValue) ? rawValue : min;
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const isUserScroll   = useRef(false);
+  const isProgrammatic = useRef(false);
+  const commitTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stable values array — only rebuilt when min/max/step change
+  // liveIdx: which slot is currently centred while the finger/mouse is moving.
+  // null = not scrolling → fall back to the committed value for highlighting.
+  const [liveIdx, setLiveIdx] = useState<number | null>(null);
+
   const values = useMemo(() => buildValues(min, max, step), [min, max, step]);
 
-  // Scroll to value when it changes externally — but guard so this
-  // doesn't fire while the user is scrolling, AND mark it programmatic
-  // so onScroll ignores the resulting scroll event
+  // Derive the committed index from the value prop
+  const committedIdx = values.findIndex(v => Math.abs(v - value) < step * 0.5);
+
+  // What to highlight: live position while scrolling, committed when still
+  const activeIdx = liveIdx ?? (committedIdx >= 0 ? committedIdx : 0);
+
+  // Scroll to value when it changes externally
   useEffect(() => {
     if (isUserScroll.current) return;
     const el = containerRef.current;
@@ -54,20 +61,18 @@ export function ScrollPicker({
     if (idx < 0) return;
     isProgrammatic.current = true;
     el.scrollTop = idx * ITEM_H;
-    // Clear the flag after the scroll event has had a chance to fire
     requestAnimationFrame(() => { isProgrammatic.current = false; });
   }, [value, values, step]);
 
   const commit = useCallback(() => {
     isUserScroll.current = false;
+    setLiveIdx(null);  // stop live highlighting — snap to committed value
     const el = containerRef.current;
     if (!el) return;
     const idx     = Math.round(el.scrollTop / ITEM_H);
     const clamped = Math.max(0, Math.min(idx, values.length - 1));
     const snapped = values[clamped];
     if (snapped === undefined) return;
-    // Snap position — mark as programmatic so the resulting scroll
-    // event doesn't re-trigger commit
     isProgrammatic.current = true;
     el.scrollTo({ top: clamped * ITEM_H, behavior: "smooth" });
     requestAnimationFrame(() => { isProgrammatic.current = false; });
@@ -75,12 +80,19 @@ export function ScrollPicker({
   }, [values, onChange]);
 
   const onScroll = useCallback(() => {
-    // Ignore scrolls that WE caused — only react to real user input
     if (isProgrammatic.current) return;
     isUserScroll.current = true;
+
+    // Update highlighted item in real-time as each number passes through centre
+    const el = containerRef.current;
+    if (el) {
+      const idx = Math.round(el.scrollTop / ITEM_H);
+      setLiveIdx(Math.max(0, Math.min(idx, values.length - 1)));
+    }
+
     if (commitTimer.current) clearTimeout(commitTimer.current);
     commitTimer.current = setTimeout(commit, 120);
-  }, [commit]);
+  }, [commit, values]);
 
   return (
     <div className={cn("flex flex-col items-center gap-2", className)}>
@@ -106,21 +118,20 @@ export function ScrollPicker({
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {values.map((v) => (
+          {values.map((v, i) => (
             <div
               key={v}
               onClick={() => {
-                const idx = values.indexOf(v);
                 isProgrammatic.current = true;
-                containerRef.current?.scrollTo({ top: idx * ITEM_H, behavior: "smooth" });
+                containerRef.current?.scrollTo({ top: i * ITEM_H, behavior: "smooth" });
                 requestAnimationFrame(() => { isProgrammatic.current = false; });
                 onChange(v);
               }}
               className={cn(
-                "flex cursor-pointer items-center justify-center text-center font-semibold",
-                Math.abs(v - value) < step * 0.5
+                "flex cursor-pointer items-center justify-center text-center font-semibold transition-all duration-75",
+                i === activeIdx
                   ? "text-base text-foreground"
-                  : Math.abs(v - value) < step * 1.5
+                  : Math.abs(i - activeIdx) === 1
                   ? "text-sm text-muted-foreground/60"
                   : "text-xs text-muted-foreground/25"
               )}
