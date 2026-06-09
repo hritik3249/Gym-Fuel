@@ -11,7 +11,7 @@ import { foodToEntry, parseServingMeasure, sumEntries } from "@/lib/nutrition";
 import type { ServingMeasure } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
-import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchExternalFoods } from "@/lib/actions/food";
+import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchExternalFoods, searchLocalFoods } from "@/lib/actions/food";
 import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
 
 const MEALS: Array<{ id: MealType; label: string }> = [
@@ -68,30 +68,39 @@ export function FoodLogger({ foods, initialEntries }: FoodLoggerProps) {
   const [savingCustom, setSavingCustom] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [externalFoods, setExternalFoods] = useState<Food[]>([]);
+  const [localSearchFoods, setLocalSearchFoods] = useState<Food[]>([]);
   const [searchingExternal, setSearchingExternal] = useState(false);
   const [loggingFood, setLoggingFood] = useState<{ food: Food; measure: ServingMeasure | null } | null>(null);
   const [amountInput, setAmountInput] = useState("");
 
+  // When there's no query, show the pre-loaded recent foods. When searching,
+  // use DB search results (covers all 1 000+ seed foods, not just the initial 50).
   const filteredFoods = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return savedFoods.filter((food) => matchesSearch(food, term));
-  }, [query, savedFoods]);
+    if (!term) return savedFoods;
+    return localSearchFoods;
+  }, [query, savedFoods, localSearchFoods]);
 
   useEffect(() => {
     const term = query.trim();
-    if (term.length < EXTERNAL_SEARCH_MIN_LENGTH) {
+    if (term.length < 2) {
+      setLocalSearchFoods([]);
       setExternalFoods([]);
       setSearchingExternal(false);
       return;
     }
 
     let cancelled = false;
-    setSearchingExternal(true);
+    if (term.length >= EXTERNAL_SEARCH_MIN_LENGTH) setSearchingExternal(true);
 
     const timer = setTimeout(async () => {
-      const result = await searchExternalFoods(term);
+      const [localResult, externalResult] = await Promise.all([
+        searchLocalFoods(term),
+        term.length >= EXTERNAL_SEARCH_MIN_LENGTH ? searchExternalFoods(term) : Promise.resolve({ foods: [] as Food[] })
+      ]);
       if (!cancelled) {
-        setExternalFoods(result.foods);
+        setLocalSearchFoods(localResult.foods);
+        setExternalFoods(externalResult.foods);
         setSearchingExternal(false);
       }
     }, EXTERNAL_SEARCH_DEBOUNCE_MS);

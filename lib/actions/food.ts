@@ -181,3 +181,50 @@ export async function searchExternalFoods(query: string) {
 
   return { foods: await searchUsda(term) };
 }
+
+/** Searches the local foods table (seed + custom) by name — covers the full 1 000+ Indian food database. */
+export async function searchLocalFoods(query: string) {
+  const term = query.trim();
+  if (term.length < 2) return { foods: [] as Food[] };
+
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) return { foods: [] as Food[] };
+
+  const { data } = await supabase
+    .from("foods")
+    .select("*")
+    .or(`owner_id.eq.${user.id},owner_id.is.null`)
+    .ilike("name", `%${term}%`)
+    .order("name")
+    .limit(30);
+
+  return {
+    foods: (data ?? []).map(
+      (row): Food => ({
+        id: row.id,
+        name: row.name,
+        brand: row.brand ?? undefined,
+        serving: row.serving,
+        source: row.source,
+        cuisine: row.cuisine ?? undefined,
+        favorite: false,
+        calories: Number(row.calories),
+        protein: Number(row.protein),
+        carbs: Number(row.carbs),
+        fat: Number(row.fat),
+        fiber: Number(row.fiber),
+        iron: Number(row.iron),
+        calcium: Number(row.calcium),
+        magnesium: Number(row.magnesium),
+        zinc: Number(row.zinc),
+        potassium: Number(row.potassium),
+        sodium: Number(row.sodium),
+        vitaminD: Number(row.vitamin_d),
+        vitaminB12: Number(row.vitamin_b12)
+      })
+    )
+  };
+}
