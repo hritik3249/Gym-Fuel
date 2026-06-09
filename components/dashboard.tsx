@@ -14,7 +14,7 @@ import { clampProgress, formatNumber } from "@/lib/utils";
 import { logWater } from "@/lib/actions/water";
 import type { DailyTrend, FoodEntry, Goal, MealType, Nutrients, WeightLog } from "@/lib/types";
 
-const MACRO_TONES = { calories: "emerald", protein: "sky", carbs: "amber", fat: "rose" } as const;
+const MACRO_TONES = { calories: "amber", protein: "emerald", carbs: "sky", fat: "rose" } as const;
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snacks"];
 const WATER_QUICK_ADD_ML = [250, 500, 750, 1000];
 const CHART_TOOLTIP_STYLE = { borderRadius: 8, border: "1px solid hsl(var(--border))" };
