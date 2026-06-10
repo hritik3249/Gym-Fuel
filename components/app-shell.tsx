@@ -99,10 +99,11 @@ export function AppShell({
     return () => window.removeEventListener("popstate", sync);
   }, []);
 
-  // Keep activeTab in sync if Next.js router navigates us to a non-tab route
-  // (e.g. router.replace("/app/onboarding") from inside a tab component).
+  // Keep activeTab in sync with ANY Next.js router navigation — covers
+  // <Link href="/app/foods"> on the dashboard, router.push/replace from tab
+  // components (e.g. onboarding redirect), and deep links.
   useEffect(() => {
-    if (!TAB_PATHS.has(pathname as TabPath)) setActiveTab(pathname);
+    setActiveTab(pathname);
   }, [pathname]);
 
   const isTabRoute = TAB_PATHS.has(activeTab as TabPath);

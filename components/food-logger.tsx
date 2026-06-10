@@ -12,6 +12,7 @@ import type { ServingMeasure } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
 import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchLocalFoods, getFoodEntriesForDate } from "@/lib/actions/food";
+import { notifyDataChanged } from "@/lib/tab-cache";
 import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -128,6 +129,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   const [searchingLocal, setSearchingLocal] = useState(false);
   const [loggingFood, setLoggingFood]       = useState<{ food: Food; measure: ServingMeasure | null } | null>(null);
   const [amountInput, setAmountInput]       = useState("");
+  const [browseOpen, setBrowseOpen]         = useState(false);
 
   // No query → show pre-loaded recent foods. Typing → DB search (all 1 000+ foods).
   const filteredFoods = useMemo(() => {
@@ -171,6 +173,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
         return;
       }
       toast.success(`Logged ${food.name}`, { description: `${entry.calories} kcal · ${MEALS.find((m) => m.id === selectedMeal)?.label}` });
+      notifyDataChanged(); // dashboard + analytics tabs refetch
     });
   }
 
@@ -206,6 +209,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
         return;
       }
       toast.success(`Duplicated ${duplicate.foodName}`);
+      notifyDataChanged();
     });
   }
 
@@ -219,6 +223,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
       if (entry) setEntries((current) => [entry, ...current]);
     } else if (entry) {
       toast.success(`Removed ${entry.foodName}`);
+      notifyDataChanged();
     }
     setDeletingId(null);
   }
@@ -252,6 +257,31 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   const recentEntries   = entries.slice(0, RECENT_ENTRIES_SHOWN);
   const frequentFoods   = savedFoods.filter((food) => food.favorite).slice(0, FREQUENT_FOODS_SHOWN);
   const dayTotals       = sumEntries(entries);
+  const isSearching     = query.trim().length > 0;
+
+  const renderFoodRow = (food: Food) => (
+    <div key={food.id} className="grid gap-3 rounded-lg border border-border bg-background p-3 sm:grid-cols-[1fr_auto]">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-semibold">{food.name}</p>
+          {food.favorite && <Heart className="size-4 fill-rose-500 text-rose-500" />}
+          <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">{food.source.replaceAll("_", " ")}</span>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {food.serving} · {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fat}g
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Iron {food.iron}mg · Calcium {food.calcium}mg · Mg {food.magnesium}mg · B12 {food.vitaminB12}mcg
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button onClick={() => startLogFood(food)} disabled={isPending}>
+          <Plus className="size-4" />
+          Log
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="container grid gap-4 py-4 sm:py-6">
@@ -352,113 +382,27 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
 
       {!loadingDate && (
         <>
-          {/* Today: show food database + custom food form */}
-          {isToday && (
-            <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Food Database</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3">
-                  {searchingLocal ? (
-                    <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Searching…
-                    </div>
-                  ) : filteredFoods.length === 0 ? (
-                    <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      {query ? `No foods found for "${query}"` : "No foods yet — create a custom food to get started."}
-                    </p>
-                  ) : (
-                    filteredFoods.map((food) => (
-                      <div key={food.id} className="grid gap-3 rounded-lg border border-border bg-background p-3 sm:grid-cols-[1fr_auto]">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold">{food.name}</p>
-                            {food.favorite && <Heart className="size-4 fill-rose-500 text-rose-500" />}
-                            <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">{food.source.replaceAll("_", " ")}</span>
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {food.serving} · {food.calories} kcal · P {food.protein}g · C {food.carbs}g · F {food.fat}g
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Iron {food.iron}mg · Calcium {food.calcium}mg · Mg {food.magnesium}mg · B12 {food.vitaminB12}mcg
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button onClick={() => startLogFood(food)} disabled={isPending}>
-                            <Plus className="size-4" />
-                            Log
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="grid gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Create Custom Food</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-3">
-                    <div className="grid gap-2">
-                      <Label htmlFor="food-name">Food name</Label>
-                      <Input id="food-name" value={customFood.name} onChange={(e) => updateCustomFoodField("name", e.target.value)} placeholder="e.g. Homemade Dal" />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="serving">Serving size</Label>
-                      <Input id="serving" value={customFood.serving} onChange={(e) => updateCustomFoodField("serving", e.target.value)} placeholder="1 bowl, 180g" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {CUSTOM_FOOD_NUMBER_FIELDS.map((field) => (
-                        <div key={field} className="grid gap-2">
-                          <Label htmlFor={field}>{field}</Label>
-                          <Input
-                            id={field}
-                            inputMode="decimal"
-                            value={customFood[field] || ""}
-                            placeholder="0"
-                            onChange={(e) => updateCustomFoodField(field, Number(e.target.value || 0))}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <Button onClick={handleSaveCustomFood} disabled={savingCustom || !customFood.name.trim()}>
-                      {savingCustom ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                      Save and log
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {recentEntries.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Foods</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-2">
-                      {recentEntries.map((entry) => (
-                        <button
-                          key={entry.id}
-                          onClick={() => handleDuplicateEntry(entry)}
-                          disabled={isPending}
-                          className="flex items-center justify-between rounded-md border border-border bg-background p-3 text-left hover:bg-accent disabled:opacity-50"
-                        >
-                          <span>
-                            <span className="block text-sm font-semibold">{entry.foodName}</span>
-                            <span className="block text-xs text-muted-foreground">
-                              {entry.meal} · {entry.calories} kcal
-                            </span>
-                          </span>
-                          <Copy className="size-4 text-muted-foreground" />
-                        </button>
-                      ))}
-                    </CardContent>
-                  </Card>
+          {/* Search results — appear right under the search bar while typing */}
+          {isToday && isSearching && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Search results</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {searchingLocal ? (
+                  <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" />
+                    Searching…
+                  </div>
+                ) : filteredFoods.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                    No foods found for &quot;{query}&quot;
+                  </p>
+                ) : (
+                  filteredFoods.map(renderFoodRow)
                 )}
-              </div>
-            </section>
+              </CardContent>
+            </Card>
           )}
 
           {/* Day total summary (shown on past dates + today) */}
@@ -524,6 +468,96 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
               </Card>
             ))}
           </section>
+
+          {/* Today: browse database (collapsed by default) + custom food + recent */}
+          {isToday && (
+            <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Food Database</span>
+                    <Button variant="outline" size="sm" onClick={() => setBrowseOpen((open) => !open)}>
+                      {browseOpen ? "Hide" : `Browse ${savedFoods.length} foods`}
+                      <ChevronRight className={`size-4 transition-transform ${browseOpen ? "rotate-90" : ""}`} />
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                {browseOpen && (
+                  <CardContent className="grid gap-3">
+                    {savedFoods.length === 0 ? (
+                      <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                        No foods yet — create a custom food to get started.
+                      </p>
+                    ) : (
+                      savedFoods.map(renderFoodRow)
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+
+              <div className="grid gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Create Custom Food</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="food-name">Food name</Label>
+                      <Input id="food-name" value={customFood.name} onChange={(e) => updateCustomFoodField("name", e.target.value)} placeholder="e.g. Homemade Dal" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="serving">Serving size</Label>
+                      <Input id="serving" value={customFood.serving} onChange={(e) => updateCustomFoodField("serving", e.target.value)} placeholder="1 bowl, 180g" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {CUSTOM_FOOD_NUMBER_FIELDS.map((field) => (
+                        <div key={field} className="grid gap-2">
+                          <Label htmlFor={field}>{field}</Label>
+                          <Input
+                            id={field}
+                            inputMode="decimal"
+                            value={customFood[field] || ""}
+                            placeholder="0"
+                            onChange={(e) => updateCustomFoodField(field, Number(e.target.value || 0))}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <Button onClick={handleSaveCustomFood} disabled={savingCustom || !customFood.name.trim()}>
+                      {savingCustom ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                      Save and log
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {recentEntries.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Foods</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-2">
+                      {recentEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          onClick={() => handleDuplicateEntry(entry)}
+                          disabled={isPending}
+                          className="flex items-center justify-between rounded-md border border-border bg-background p-3 text-left hover:bg-accent disabled:opacity-50"
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold">{entry.foodName}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {entry.meal} · {entry.calories} kcal
+                            </span>
+                          </span>
+                          <Copy className="size-4 text-muted-foreground" />
+                        </button>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </section>
+          )}
         </>
       )}
 

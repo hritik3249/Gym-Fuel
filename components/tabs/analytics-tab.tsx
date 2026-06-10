@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AnalyticsView } from "@/components/analytics-view";
 import { getAnalyticsPageData } from "@/lib/actions/page-data";
-import { cacheGet, cacheSet } from "@/lib/tab-cache";
+import { cacheGet, cacheSet, onDataChanged } from "@/lib/tab-cache";
 import AnalyticsLoading from "@/app/app/analytics/loading";
 import type { AnalyticsPageData } from "@/lib/queries/dashboard";
 
@@ -15,11 +15,15 @@ export function AnalyticsTab() {
   const [data, setData] = useState<AnalyticsPageData | null>(() => cacheGet(KEY) ?? null);
 
   useEffect(() => {
-    getAnalyticsPageData().then((d) => {
-      if (d.isNewUser) { router.replace("/app/onboarding"); return; }
-      cacheSet(KEY, d);
-      setData(d);
-    });
+    const refetch = () =>
+      getAnalyticsPageData().then((d) => {
+        if (d.isNewUser) { router.replace("/app/onboarding"); return; }
+        cacheSet(KEY, d);
+        setData(d);
+      });
+
+    refetch();
+    return onDataChanged(refetch);
   }, [router]);
 
   if (!data) return <AnalyticsLoading />;

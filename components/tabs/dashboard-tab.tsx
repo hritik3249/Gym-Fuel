@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
 import { getDashboardSnapshot } from "@/lib/actions/page-data";
-import { cacheGet, cacheSet } from "@/lib/tab-cache";
+import { cacheGet, cacheSet, onDataChanged } from "@/lib/tab-cache";
 import DashboardLoading from "@/app/app/dashboard/loading";
 import type { DashboardSnapshot } from "@/lib/queries/dashboard";
 
@@ -20,11 +20,16 @@ export function DashboardTab() {
   const [data, setData] = useState<DashboardSnapshot | null>(() => cacheGet(cacheKey) ?? null);
 
   useEffect(() => {
-    getDashboardSnapshot(today).then((d) => {
-      if (d.isNewUser) { router.replace("/app/onboarding"); return; }
-      cacheSet(cacheKey, d);
-      setData(d);
-    });
+    const refetch = () =>
+      getDashboardSnapshot(today).then((d) => {
+        if (d.isNewUser) { router.replace("/app/onboarding"); return; }
+        cacheSet(cacheKey, d);
+        setData(d);
+      });
+
+    refetch();
+    // Refetch whenever another tab mutates data (food logged, water added…)
+    return onDataChanged(refetch);
   }, [today, cacheKey, router]);
 
   if (!data) return <DashboardLoading />;

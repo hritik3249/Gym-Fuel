@@ -13,3 +13,18 @@ export function cacheGet<T>(key: string): T | undefined {
 export function cacheSet(key: string, data: unknown): void {
   store.set(key, { data, ts: Date.now() });
 }
+
+// ── Cross-tab change notification ────────────────────────────────────────────
+// When one tab mutates data (e.g. food logged), other always-mounted tabs
+// (dashboard, analytics) listen for this event and refetch.
+
+const DATA_CHANGED_EVENT = "ft:data-changed";
+
+export function notifyDataChanged(): void {
+  window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
+}
+
+export function onDataChanged(callback: () => void): () => void {
+  window.addEventListener(DATA_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(DATA_CHANGED_EVENT, callback);
+}
