@@ -145,6 +145,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   const [searchingLocal, setSearchingLocal] = useState(false);
   const [loggingFood, setLoggingFood]       = useState<{ food: Food; measure: ServingMeasure | null } | null>(null);
   const [amountInput, setAmountInput]       = useState("");
+  const [logUnit, setLogUnit]               = useState<"g" | "ml" | "serving">("serving");
   const [browseOpen, setBrowseOpen]         = useState(false);
   const [servingAmount, setServingAmount]   = useState("1");
   const [servingUnit, setServingUnit]       = useState<string>("serving");
@@ -208,14 +209,36 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   function startLogFood(food: Food) {
     const measure = parseServingMeasure(food.serving);
     setLoggingFood({ food, measure });
+    setLogUnit(measure?.unit ?? "serving");
     setAmountInput(String(measure?.amount ?? 1));
+  }
+
+  /** Servings of the base food represented by the current amount + unit. */
+  function logQuantity(): number {
+    if (!loggingFood) return 0;
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) return 0;
+    if (logUnit === "serving" || !loggingFood.measure) return amount;
+    return amount / loggingFood.measure.amount;
+  }
+
+  function switchLogUnit(unit: "g" | "ml" | "serving") {
+    if (!loggingFood) return;
+    // Convert the current amount so the logged quantity stays the same
+    const quantity = logQuantity();
+    setLogUnit(unit);
+    if (quantity <= 0) return;
+    if (unit === "serving" || !loggingFood.measure) {
+      setAmountInput(String(Math.round(quantity * 100) / 100));
+    } else {
+      setAmountInput(String(Math.round(quantity * loggingFood.measure.amount * 10) / 10));
+    }
   }
 
   function confirmLogFood() {
     if (!loggingFood) return;
-    const amount = Number(amountInput);
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const quantity = loggingFood.measure ? amount / loggingFood.measure.amount : amount;
+    const quantity = logQuantity();
+    if (quantity <= 0) return;
     handleLogFood(loggingFood.food, quantity);
     setLoggingFood(null);
     setAmountInput("");
@@ -693,34 +716,76 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
               <CardTitle>How much {loggingFood.food.name}?</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
-              {loggingFood.measure ? (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    Base serving is {loggingFood.measure.amount}{loggingFood.measure.unit} ({loggingFood.food.serving}). Enter the actual amount you had.
-                  </p>
-                  <div className="grid gap-2">
-                    <Label htmlFor="log-amount">Amount ({loggingFood.measure.unit})</Label>
-                    <Input id="log-amount" type="number" min="0" step="any" autoFocus value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && confirmLogFood()} />
+              <p className="text-sm text-muted-foreground">
+                One serving is {loggingFood.food.serving}
+                {loggingFood.measure ? ` (${loggingFood.measure.amount}${loggingFood.measure.unit})` : ""}. Enter how much you had.
+              </p>
+
+              {/* Amount + unit */}
+              <div className="grid gap-2">
+                <Label htmlFor="log-amount">Amount</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="log-amount"
+                    type="number"
+                    min="0"
+                    step="any"
+                    autoFocus
+                    className="flex-1"
+                    value={amountInput}
+                    onChange={(e) => setAmountInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && confirmLogFood()}
+                  />
+                  {loggingFood.measure ? (
+                    <div className="grid grid-cols-2 gap-1 rounded-md border border-border bg-background p-1">
+                      {([loggingFood.measure.unit, "serving"] as const).map((unit) => (
+                        <button
+                          key={unit}
+                          type="button"
+                          onClick={() => switchLogUnit(unit)}
+                          className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            logUnit === unit ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {unit === "serving" ? "servings" : unit}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="flex items-center rounded-md border border-border bg-background px-3 text-sm text-muted-foreground">
+                      servings
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Live macro preview — recalculates as the amount changes */}
+              {(() => {
+                const quantity = logQuantity();
+                const preview = [
+                  { label: "Calories", value: formatNumber(loggingFood.food.calories * quantity),    unit: "kcal" },
+                  { label: "Protein",  value: formatNumber(loggingFood.food.protein * quantity, 1),  unit: "g"    },
+                  { label: "Carbs",    value: formatNumber(loggingFood.food.carbs * quantity, 1),    unit: "g"    },
+                  { label: "Fat",      value: formatNumber(loggingFood.food.fat * quantity, 1),      unit: "g"    },
+                ];
+                return (
+                  <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-background p-3 text-center">
+                    {preview.map(({ label, value, unit }) => (
+                      <div key={label}>
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="text-sm font-bold">
+                          {quantity > 0 ? value : "–"}
+                          <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unit}</span>
+                        </p>
+                      </div>
+                    ))}
                   </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    One serving is {loggingFood.food.serving}. How many servings did you have?
-                  </p>
-                  <div className="grid gap-2">
-                    <Label htmlFor="log-amount">Servings</Label>
-                    <Input id="log-amount" type="number" min="0" step="any" autoFocus value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && confirmLogFood()} />
-                  </div>
-                </>
-              )}
+                );
+              })()}
+
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={cancelLogFood}>Cancel</Button>
-                <Button className="flex-1" onClick={confirmLogFood} disabled={isPending}>
+                <Button className="flex-1" onClick={confirmLogFood} disabled={isPending || logQuantity() <= 0}>
                   <Plus className="size-4" />
                   Log it
                 </Button>
