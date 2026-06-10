@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 /** Save a push subscription for the current user's device. */
@@ -55,6 +54,5 @@ export async function saveReminderPrefs(prefs: {
     .eq("id", user.id);
 
   if (error) return { error: error.message };
-  revalidatePath("/app/settings");
   return { success: true };
 }

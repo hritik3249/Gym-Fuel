@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { calculateGoals } from "@/lib/calculator";
 import type { ActivityLevel, FitnessGoal, Gender } from "@/lib/calculator";
@@ -62,9 +61,6 @@ export async function saveProfile(formData: FormData) {
 
   await supabase.from("weight_logs").insert({ user_id: user.id, weight_kg: weightKg });
 
-  revalidatePath("/app/dashboard");
-  revalidatePath("/app/settings");
-  revalidatePath("/app/weight");
 
   return { success: true, calculated };
 }

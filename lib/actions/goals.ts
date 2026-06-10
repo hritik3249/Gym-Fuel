@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { defaultGoals } from "@/lib/nutrition";
 
@@ -26,7 +25,5 @@ export async function saveGoals(formData: FormData) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/app/dashboard");
-  revalidatePath("/app/settings");
   return { success: true };
 }

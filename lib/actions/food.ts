@@ -1,16 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
 
-const FOOD_PATHS = ["/app/dashboard", "/app/foods"] as const;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function revalidateFoodPaths() {
-  for (const path of FOOD_PATHS) revalidatePath(path);
-}
 
 function mapFoodEntry(row: Record<string, unknown>): FoodEntry {
   return {
@@ -115,7 +109,6 @@ export async function logFoodEntry(entry: LoggableEntry) {
   // Update streak after first log of the day.
   await updateStreak(supabase, user.id, entry.entryDate);
 
-  revalidateFoodPaths();
   return { success: true };
 }
 
@@ -129,7 +122,6 @@ export async function deleteFoodEntry(id: string) {
   const { error } = await supabase.from("food_entries").delete().eq("id", id).eq("user_id", user.id);
   if (error) return { error: error.message };
 
-  revalidateFoodPaths();
   return { success: true };
 }
 
@@ -192,7 +184,6 @@ export async function saveCustomFood(food: CustomFoodInput) {
 
   await supabase.from("saved_foods").insert({ user_id: user.id, food_id: data.id, favorite: true });
 
-  revalidatePath("/app/foods");
   return { success: true, food: data as { id: string } };
 }
 

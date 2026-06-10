@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export type LogWeightInput = {
@@ -25,7 +24,5 @@ export async function logWeight(input: LogWeightInput) {
 
   if (error) return { error: error.message };
 
-  revalidatePath("/app/dashboard");
-  revalidatePath("/app/weight");
   return { success: true };
 }
