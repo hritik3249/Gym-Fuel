@@ -25,10 +25,12 @@ const TAB_PATHS = new Set(TABS.map((t) => t.path));
 
 // Navigate without going through the Next.js router — just updates the URL
 // and flips the CSS visibility. Zero network round-trips, zero React remounts.
+// Next.js 15 intercepts native pushState and updates usePathname, which the
+// shell's pathname effect syncs to activeTab. (Do NOT dispatch a synthetic
+// popstate here — Next's router treats a stateless popstate as an external
+// navigation and can hard-reload the page.)
 function pushTab(path: string) {
   history.pushState(null, "", path);
-  // Dispatch a custom event so the shell can react without a router re-render
-  window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 }
 
 function NavItem({

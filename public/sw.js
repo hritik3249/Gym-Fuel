@@ -1,4 +1,9 @@
-const CACHE_NAME = "fueltrack-v3";
+// v4: cache ONLY the static app shell (manifest + icon). v3 cached every
+// same-origin GET — including Next.js JS chunks — so installed PWAs kept
+// running code from old deployments. Stale clients then called server
+// actions whose IDs no longer existed on the server, and Next.js recovered
+// with a full page reload (the "tab refreshes when I search" bug).
+const CACHE_NAME = "fueltrack-v4";
 const APP_SHELL = ["/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -13,22 +18,12 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  if (event.request.mode === "navigate" || event.request.destination === "document") {
-    event.respondWith(fetch(event.request));
-    return;
+  const url = new URL(event.request.url);
+  // Serve only the precached shell from cache; let the browser handle
+  // everything else (Next.js assets carry immutable cache headers already).
+  if (url.origin === self.location.origin && APP_SHELL.includes(url.pathname)) {
+    event.respondWith(caches.match(event.request).then((cached) => cached ?? fetch(event.request)));
   }
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        const clone = response.clone();
-        if (response.ok && event.request.url.startsWith(self.location.origin)) {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    })
-  );
 });
 
 // ── Push notifications ─────────────────────────────────────────────────────
