@@ -149,6 +149,15 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   const [servingAmount, setServingAmount]   = useState("1");
   const [servingUnit, setServingUnit]       = useState<string>("serving");
   const [extrasOpen, setExtrasOpen]         = useState(false);
+  // Raw text for nutrient fields so partial decimals ("2.", "0.5") survive
+  // typing — customFood keeps the parsed numbers for saving/estimates.
+  const [nutrientInputs, setNutrientInputs] = useState<Record<string, string>>({});
+
+  function handleNutrientInput(key: keyof Nutrients, raw: string) {
+    if (!/^\d*\.?\d*$/.test(raw)) return; // digits and one dot only
+    setNutrientInputs((current) => ({ ...current, [key]: raw }));
+    updateCustomFoodField(key, Number(raw) || 0);
+  }
 
   // No query → show pre-loaded recent foods. Typing → DB search (all 1 000+ foods).
   const filteredFoods = useMemo(() => {
@@ -265,6 +274,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
       description: logAfter ? "Logged and added to your database." : "Added to your database — find it anytime via search.",
     });
     setCustomFood(BLANK_CUSTOM_FOOD);
+    setNutrientInputs({});
     setServingAmount("1");
     setServingUnit("serving");
     setExtrasOpen(false);
@@ -555,7 +565,7 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
                           inputMode="decimal"
                           className="w-24"
                           value={servingAmount}
-                          onChange={(e) => setServingAmount(e.target.value)}
+                          onChange={(e) => /^\d*\.?\d*$/.test(e.target.value) && setServingAmount(e.target.value)}
                           placeholder="1"
                         />
                         <select
@@ -585,9 +595,9 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
                             <Input
                               id={key}
                               inputMode="decimal"
-                              value={customFood[key] || ""}
+                              value={nutrientInputs[key] ?? ""}
                               placeholder="0"
-                              onChange={(e) => updateCustomFoodField(key, Number(e.target.value || 0))}
+                              onChange={(e) => handleNutrientInput(key, e.target.value)}
                             />
                           </div>
                         ))}
@@ -595,7 +605,10 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
                       {showKcalHint && (
                         <button
                           type="button"
-                          onClick={() => updateCustomFoodField("calories", estimatedKcal)}
+                          onClick={() => {
+                            updateCustomFoodField("calories", estimatedKcal);
+                            setNutrientInputs((current) => ({ ...current, calories: String(estimatedKcal) }));
+                          }}
                           className="justify-self-start rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                         >
                           Your macros add up to ≈{estimatedKcal} kcal — tap to use
@@ -620,9 +633,9 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
                             <Input
                               id={key}
                               inputMode="decimal"
-                              value={customFood[key] || ""}
+                              value={nutrientInputs[key] ?? ""}
                               placeholder="0"
-                              onChange={(e) => updateCustomFoodField(key, Number(e.target.value || 0))}
+                              onChange={(e) => handleNutrientInput(key, e.target.value)}
                             />
                           </div>
                         ))}
