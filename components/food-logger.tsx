@@ -54,7 +54,23 @@ const MEALS: Array<{ id: MealType; label: string }> = [
   { id: "snacks",    label: "Snacks"    },
 ];
 
-const CUSTOM_FOOD_NUMBER_FIELDS = ["calories", "protein", "carbs", "fat", "fiber", "iron"] as const satisfies readonly (keyof Nutrients)[];
+const MACRO_FIELDS = [
+  { key: "calories", label: "Calories", unit: "kcal" },
+  { key: "protein",  label: "Protein",  unit: "g"    },
+  { key: "carbs",    label: "Carbs",    unit: "g"    },
+  { key: "fat",      label: "Fat",      unit: "g"    },
+] as const satisfies readonly { key: keyof Nutrients; label: string; unit: string }[];
+
+const EXTRA_FIELDS = [
+  { key: "fiber",     label: "Fiber",     unit: "g"  },
+  { key: "iron",      label: "Iron",      unit: "mg" },
+  { key: "calcium",   label: "Calcium",   unit: "mg" },
+  { key: "magnesium", label: "Magnesium", unit: "mg" },
+  { key: "zinc",      label: "Zinc",      unit: "mg" },
+  { key: "sodium",    label: "Sodium",    unit: "mg" },
+] as const satisfies readonly { key: keyof Nutrients; label: string; unit: string }[];
+
+const SERVING_UNITS = ["serving", "g", "ml", "piece", "bowl", "cup", "slice", "scoop", "tbsp"] as const;
 
 const BLANK_CUSTOM_FOOD: Omit<Food, "id" | "source"> = {
   name: "", serving: "1 serving",
@@ -130,6 +146,9 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   const [loggingFood, setLoggingFood]       = useState<{ food: Food; measure: ServingMeasure | null } | null>(null);
   const [amountInput, setAmountInput]       = useState("");
   const [browseOpen, setBrowseOpen]         = useState(false);
+  const [servingAmount, setServingAmount]   = useState("1");
+  const [servingUnit, setServingUnit]       = useState<string>("serving");
+  const [extrasOpen, setExtrasOpen]         = useState(false);
 
   // No query → show pre-loaded recent foods. Typing → DB search (all 1 000+ foods).
   const filteredFoods = useMemo(() => {
@@ -228,22 +247,33 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
     setDeletingId(null);
   }
 
-  async function handleSaveCustomFood() {
+  async function handleSaveCustomFood(logAfter: boolean) {
     if (!customFood.name.trim()) return;
     setSavingCustom(true);
-    const result = await saveCustomFood(customFood);
+    const serving = `${servingAmount || "1"} ${servingUnit}`;
+    const toSave = { ...customFood, serving };
+    const result = await saveCustomFood(toSave);
     if (result?.error) {
       toast.error("Couldn't save custom food", { description: result.error });
       setSavingCustom(false);
       return;
     }
-    const food: Food = { ...customFood, id: result.food?.id ?? crypto.randomUUID(), source: "custom", favorite: true };
+    const food: Food = { ...toSave, id: result.food?.id ?? crypto.randomUUID(), source: "custom", favorite: true };
     setSavedFoods((current) => [food, ...current]);
-    handleLogFood(food);
-    toast.success(`Saved ${food.name} to your foods`);
+    if (logAfter) handleLogFood(food);
+    toast.success(`Saved ${food.name}`, {
+      description: logAfter ? "Logged and added to your database." : "Added to your database — find it anytime via search.",
+    });
     setCustomFood(BLANK_CUSTOM_FOOD);
+    setServingAmount("1");
+    setServingUnit("serving");
+    setExtrasOpen(false);
     setSavingCustom(false);
   }
+
+  // Calories estimated from macros: 4 kcal/g protein & carbs, 9 kcal/g fat
+  const estimatedKcal = Math.round(customFood.protein * 4 + customFood.carbs * 4 + customFood.fat * 9);
+  const showKcalHint = estimatedKcal > 0 && Math.abs(estimatedKcal - customFood.calories) > Math.max(20, estimatedKcal * 0.15);
 
   function updateCustomFoodField<K extends keyof typeof customFood>(field: K, value: (typeof customFood)[K]) {
     setCustomFood((current) => ({ ...current, [field]: value }));
@@ -498,35 +528,116 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
               <div className="grid gap-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Create Custom Food</CardTitle>
+                    <CardTitle>Create Your Own Food</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Can&apos;t find something? Add it once — it&apos;s saved to your database forever and shows up in search.
+                    </p>
                   </CardHeader>
-                  <CardContent className="grid gap-3">
+                  <CardContent className="grid gap-4">
+                    {/* Step 1: name */}
                     <div className="grid gap-2">
-                      <Label htmlFor="food-name">Food name</Label>
-                      <Input id="food-name" value={customFood.name} onChange={(e) => updateCustomFoodField("name", e.target.value)} placeholder="e.g. Homemade Dal" />
+                      <Label htmlFor="food-name">
+                        <span className="mr-1.5 inline-flex size-5 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
+                        What is it called?
+                      </Label>
+                      <Input id="food-name" value={customFood.name} onChange={(e) => updateCustomFoodField("name", e.target.value)} placeholder="e.g. Mom's Paneer Curry" />
                     </div>
+
+                    {/* Step 2: serving size */}
                     <div className="grid gap-2">
-                      <Label htmlFor="serving">Serving size</Label>
-                      <Input id="serving" value={customFood.serving} onChange={(e) => updateCustomFoodField("serving", e.target.value)} placeholder="1 bowl, 180g" />
+                      <Label htmlFor="serving-amount">
+                        <span className="mr-1.5 inline-flex size-5 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
+                        How much is one serving?
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="serving-amount"
+                          inputMode="decimal"
+                          className="w-24"
+                          value={servingAmount}
+                          onChange={(e) => setServingAmount(e.target.value)}
+                          placeholder="1"
+                        />
+                        <select
+                          aria-label="Serving unit"
+                          value={servingUnit}
+                          onChange={(e) => setServingUnit(e.target.value)}
+                          className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          {SERVING_UNITS.map((unit) => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <p className="text-xs text-muted-foreground">e.g. 1 bowl, 100 g, 2 piece — the nutrition below is for this amount.</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {CUSTOM_FOOD_NUMBER_FIELDS.map((field) => (
-                        <div key={field} className="grid gap-2">
-                          <Label htmlFor={field}>{field}</Label>
-                          <Input
-                            id={field}
-                            inputMode="decimal"
-                            value={customFood[field] || ""}
-                            placeholder="0"
-                            onChange={(e) => updateCustomFoodField(field, Number(e.target.value || 0))}
-                          />
-                        </div>
-                      ))}
+
+                    {/* Step 3: macros */}
+                    <div className="grid gap-2">
+                      <Label>
+                        <span className="mr-1.5 inline-flex size-5 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">3</span>
+                        Nutrition per serving
+                      </Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {MACRO_FIELDS.map(({ key, label, unit }) => (
+                          <div key={key} className="grid gap-1.5">
+                            <Label htmlFor={key} className="text-xs text-muted-foreground">{label} ({unit})</Label>
+                            <Input
+                              id={key}
+                              inputMode="decimal"
+                              value={customFood[key] || ""}
+                              placeholder="0"
+                              onChange={(e) => updateCustomFoodField(key, Number(e.target.value || 0))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      {showKcalHint && (
+                        <button
+                          type="button"
+                          onClick={() => updateCustomFoodField("calories", estimatedKcal)}
+                          className="justify-self-start rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                        >
+                          Your macros add up to ≈{estimatedKcal} kcal — tap to use
+                        </button>
+                      )}
                     </div>
-                    <Button onClick={handleSaveCustomFood} disabled={savingCustom || !customFood.name.trim()}>
-                      {savingCustom ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                      Save and log
-                    </Button>
+
+                    {/* Optional micronutrients */}
+                    <button
+                      type="button"
+                      onClick={() => setExtrasOpen((open) => !open)}
+                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ChevronRight className={`size-4 transition-transform ${extrasOpen ? "rotate-90" : ""}`} />
+                      {extrasOpen ? "Hide extra nutrients" : "Add extra nutrients (optional)"}
+                    </button>
+                    {extrasOpen && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {EXTRA_FIELDS.map(({ key, label, unit }) => (
+                          <div key={key} className="grid gap-1.5">
+                            <Label htmlFor={key} className="text-xs text-muted-foreground">{label} ({unit})</Label>
+                            <Input
+                              id={key}
+                              inputMode="decimal"
+                              value={customFood[key] || ""}
+                              placeholder="0"
+                              onChange={(e) => updateCustomFoodField(key, Number(e.target.value || 0))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button className="flex-1" onClick={() => handleSaveCustomFood(true)} disabled={savingCustom || !customFood.name.trim()}>
+                        {savingCustom ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                        Save &amp; log now
+                      </Button>
+                      <Button variant="outline" className="flex-1" onClick={() => handleSaveCustomFood(false)} disabled={savingCustom || !customFood.name.trim()}>
+                        Save for later
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
 
