@@ -1,7 +1,7 @@
 "use client";
 
 import { BookmarkPlus, ChevronLeft, ChevronRight, Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,10 +114,17 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
   const [entries, setEntries]         = useState<FoodEntry[]>(datesMismatch ? [] : initialEntries);
   const [loadingDate, setLoadingDate] = useState(datesMismatch);
 
+  // Tracks whether the date effect is running for the initial mount — only
+  // then can the fetch be skipped (initialEntries already hold today's data).
+  // After ANY navigation the entries state holds a different day, so coming
+  // back to today must refetch or yesterday's entries stay on screen.
+  const firstDateLoadRef = useRef(true);
+
   useEffect(() => {
-    // Normal case: serverDate === todayDate → initialEntries already correct,
-    // no fetch needed unless the user navigates away from today.
-    if (viewDate === todayDate && !datesMismatch) return;
+    if (firstDateLoadRef.current) {
+      firstDateLoadRef.current = false;
+      if (viewDate === todayDate && !datesMismatch) return; // server data already correct
+    }
 
     let cancelled = false;
     setLoadingDate(true);
