@@ -24,13 +24,28 @@ export type ProgressRingProps = {
   tone?: ProgressRingTone;
 };
 
+/** Event name AppShell dispatches whenever the dashboard tab becomes
+ *  visible — rings reset to 0 and replay their sweep. */
+export const REPLAY_RINGS_EVENT = "ft:replay-rings";
+
 /** Animates a number from its current displayed value to `target` with an
  *  ease-out curve — drives both the ring sweep and the count-up text.
- *  Starts at 0 on mount, then animates between values on later updates
- *  (e.g. after logging food). */
+ *  Starts at 0 on mount, animates between values on later updates (e.g.
+ *  after logging food), and replays from 0 on REPLAY_RINGS_EVENT. */
 function useAnimatedNumber(target: number, duration = 900): number {
   const [display, setDisplay] = useState(0);
   const displayRef = useRef(0);
+  const [replayTick, setReplayTick] = useState(0);
+
+  useEffect(() => {
+    const replay = () => {
+      displayRef.current = 0;
+      setDisplay(0);
+      setReplayTick((t) => t + 1);
+    };
+    window.addEventListener(REPLAY_RINGS_EVENT, replay);
+    return () => window.removeEventListener(REPLAY_RINGS_EVENT, replay);
+  }, []);
 
   useEffect(() => {
     const from = displayRef.current;
@@ -48,7 +63,7 @@ function useAnimatedNumber(target: number, duration = 900): number {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target, duration]);
+  }, [target, duration, replayTick]);
 
   return display;
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Activity, BarChart3, Droplets, Flame, Home, Moon, Scale, Search, Settings, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { REPLAY_RINGS_EVENT } from "@/components/progress-ring";
 import { DashboardTab } from "@/components/tabs/dashboard-tab";
 import { FoodsTab }     from "@/components/tabs/foods-tab";
 import { AnalyticsTab } from "@/components/tabs/analytics-tab";
@@ -87,7 +88,6 @@ export function AppShell({
   streak: number;
 }) {
   const pathname = usePathname(); // used only as the initial active tab value
-  const router   = useRouter();
   const { theme, setTheme } = useTheme();
 
   // activeTab drives CSS show/hide — updated via pushState, not Next.js router
@@ -107,6 +107,14 @@ export function AppShell({
   useEffect(() => {
     setActiveTab(pathname);
   }, [pathname]);
+
+  // Replay the dashboard ring animations every time the tab becomes visible —
+  // the tab stays mounted, so the rings need an explicit signal to re-sweep.
+  useEffect(() => {
+    if (activeTab === "/app/dashboard") {
+      window.dispatchEvent(new Event(REPLAY_RINGS_EVENT));
+    }
+  }, [activeTab]);
 
   const isTabRoute = TAB_PATHS.has(activeTab as TabPath);
 
