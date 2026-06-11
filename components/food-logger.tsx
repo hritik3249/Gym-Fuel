@@ -163,7 +163,9 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
   const [saveMealTarget, setSaveMealTarget] = useState<{ meal: MealType; label: string } | null>(null);
   const [mealNameInput, setMealNameInput]   = useState("");
   const [savingMeal, setSavingMeal]         = useState(false);
-  const [loggingMealId, setLoggingMealId]   = useState<string | null>(null);
+  // Guards against double-tap duplicate logs without any visible "buffering" —
+  // the UI is optimistic, so the button stays active-looking the whole time.
+  const inFlightMeals = useRef<Set<string>>(new Set());
 
   function handleNutrientInput(key: keyof Nutrients, raw: string) {
     if (!/^\d*\.?\d*$/.test(raw)) return; // digits and one dot only
@@ -361,6 +363,10 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
   }
 
   async function handleLogSavedMeal(meal: SavedMeal) {
+    // Silent double-tap guard — no visible button state; the UI is optimistic.
+    if (inFlightMeals.current.has(meal.id)) return;
+    inFlightMeals.current.add(meal.id);
+
     // Optimistic: show the entries and toast immediately, sync in background.
     const now = new Date().toISOString();
     const optimistic: FoodEntry[] = meal.items.map((item) => ({
@@ -374,9 +380,8 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
     const kcal = Math.round(meal.items.reduce((sum, item) => sum + item.calories, 0));
     toast.success(`Logged ${meal.name}`, { description: `${meal.items.length} items · ${kcal} kcal` });
 
-    setLoggingMealId(meal.id);
     const result = await logSavedMeal(meal.id, viewDate);
-    setLoggingMealId(null);
+    inFlightMeals.current.delete(meal.id);
 
     if (result?.error || !result?.entries) {
       // Roll back the optimistic entries
@@ -534,8 +539,8 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
                             </p>
                           </div>
                           <div className="flex shrink-0 gap-1.5">
-                            <Button size="sm" onClick={() => handleLogSavedMeal(meal)} disabled={loggingMealId !== null}>
-                              {loggingMealId === meal.id ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                            <Button size="sm" onClick={() => handleLogSavedMeal(meal)}>
+                              <Plus className="size-4" />
                               Log
                             </Button>
                             <Button variant="outline" size="icon" onClick={() => handleDeleteSavedMeal(meal)} aria-label={`Delete ${meal.name}`}>
