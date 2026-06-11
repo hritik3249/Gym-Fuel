@@ -483,23 +483,62 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
             )}
           </div>
 
-          {isToday && frequentFoods.length > 0 && (
-            <Card className="bg-background/75">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Star className="size-4 text-amber-500" />
-                  One-tap logging
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {frequentFoods.map((food) => (
-                  <Button key={food.id} variant="secondary" size="sm" onClick={() => handleLogFood(food)} disabled={isPending}>
-                    <Plus className="size-3.5" />
-                    {food.name}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
+          {isToday && (meals.length > 0 || frequentFoods.length > 0) && (
+            <div className="grid content-start gap-3">
+              {meals.length > 0 && (
+                <Card className="bg-background/75">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <BookmarkPlus className="size-4 text-primary" />
+                      Saved Meals
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-2">
+                    {meals.map((meal) => {
+                      const kcal = Math.round(meal.items.reduce((sum, item) => sum + item.calories, 0));
+                      return (
+                        <div key={meal.id} className="flex items-center justify-between gap-2 rounded-md border border-border bg-background p-2.5">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{meal.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {MEALS.find((m) => m.id === meal.meal)?.label} · {meal.items.length} item{meal.items.length === 1 ? "" : "s"} · {kcal} kcal
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-1.5">
+                            <Button size="sm" onClick={() => handleLogSavedMeal(meal)} disabled={loggingMealId !== null}>
+                              {loggingMealId === meal.id ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                              Log
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => handleDeleteSavedMeal(meal)} aria-label={`Delete ${meal.name}`}>
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+
+              {frequentFoods.length > 0 && (
+                <Card className="bg-background/75">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Star className="size-4 text-amber-500" />
+                      One-tap logging
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-wrap gap-2">
+                    {frequentFoods.map((food) => (
+                      <Button key={food.id} variant="secondary" size="sm" onClick={() => handleLogFood(food)} disabled={isPending}>
+                        <Plus className="size-3.5" />
+                        {food.name}
+                      </Button>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </div>
       </section>
@@ -514,42 +553,6 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
 
       {!loadingDate && (
         <>
-          {/* Saved meals — log a whole meal in one tap */}
-          {isToday && meals.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <BookmarkPlus className="size-4 text-primary" />
-                  Saved Meals
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                {meals.map((meal) => {
-                  const kcal = Math.round(meal.items.reduce((sum, item) => sum + item.calories, 0));
-                  return (
-                    <div key={meal.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">{meal.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {MEALS.find((m) => m.id === meal.meal)?.label} · {meal.items.length} item{meal.items.length === 1 ? "" : "s"} · {kcal} kcal
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        <Button size="sm" onClick={() => handleLogSavedMeal(meal)} disabled={loggingMealId !== null}>
-                          {loggingMealId === meal.id ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                          Log
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => handleDeleteSavedMeal(meal)} aria-label={`Delete ${meal.name}`}>
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
-
           {/* Search results — appear right under the search bar while typing */}
           {isToday && isSearching && (
             <Card>
