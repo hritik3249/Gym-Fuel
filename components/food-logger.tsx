@@ -13,6 +13,7 @@ import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
 import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchLocalFoods, getFoodEntriesForDate } from "@/lib/actions/food";
 import { saveMeal, deleteSavedMeal, logSavedMeal } from "@/lib/actions/meals";
+import { addToCatalog, isCatalogReady, loadCatalog, searchCatalog } from "@/lib/food-catalog";
 import { notifyDataChanged } from "@/lib/tab-cache";
 import type { Food, FoodEntry, MealType, Nutrients, SavedMeal, SavedMealItem } from "@/lib/types";
 
@@ -169,6 +170,11 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
     return localSearchFoods;
   }, [query, savedFoods, localSearchFoods]);
 
+  // Load the full catalog into memory once — after this, search is instant.
+  useEffect(() => {
+    loadCatalog();
+  }, []);
+
   useEffect(() => {
     const term = query.trim();
     if (term.length < LOCAL_SEARCH_MIN_LENGTH) {
@@ -177,6 +183,14 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
       return;
     }
 
+    // Catalog in memory → search synchronously, zero network per keystroke.
+    if (isCatalogReady()) {
+      setLocalSearchFoods(searchCatalog(term));
+      setSearchingLocal(false);
+      return;
+    }
+
+    // Fallback while the catalog is still downloading: server-side search.
     let cancelled = false;
     setSearchingLocal(true);
 
@@ -295,6 +309,7 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
     }
     const food: Food = { ...toSave, id: result.food?.id ?? crypto.randomUUID(), source: "custom", favorite: true };
     setSavedFoods((current) => [food, ...current]);
+    addToCatalog(food); // keep in-memory search index in sync
     if (logAfter) handleLogFood(food);
     toast.success(`Saved ${food.name}`, {
       description: logAfter ? "Logged and added to your database." : "Added to your database — find it anytime via search.",
