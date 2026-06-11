@@ -2,7 +2,7 @@ import { subDays } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { defaultGoals, emptyNutrients, sumEntries } from "@/lib/nutrition";
 import { todayISO } from "@/lib/utils";
-import type { Achievement, DailyTrend, Food, FoodEntry, Goal, WaterLog, WeightLog } from "@/lib/types";
+import type { Achievement, DailyTrend, Food, FoodEntry, Goal, SavedMeal, WaterLog, WeightLog } from "@/lib/types";
 
 const TREND_DAYS = 14;
 const RECENT_WEIGHT_LOGS = 30;
@@ -169,18 +169,18 @@ async function requireSession() {
   return { supabase, user, isNewUser };
 }
 
-export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; serverDate: string; isNewUser: boolean };
+export type FoodsPageData = { foods: Food[]; entries: FoodEntry[]; savedMeals: SavedMeal[]; serverDate: string; isNewUser: boolean };
 
 /** Lighter-weight fetch for the food logger page — skips goals, water, weight, streak, and trend data.
  *  Also returns serverDate (UTC YYYY-MM-DD) so the client can detect timezone mismatches. */
 export async function getFoodsPageData(): Promise<FoodsPageData> {
   const session = await requireSession();
   const serverDate = todayISO();
-  if (!session) return { foods: [], entries: [], serverDate, isNewUser: true };
+  if (!session) return { foods: [], entries: [], savedMeals: [], serverDate, isNewUser: true };
   const { supabase, user, isNewUser } = session;
-  if (isNewUser) return { foods: [], entries: [], serverDate, isNewUser };
+  if (isNewUser) return { foods: [], entries: [], savedMeals: [], serverDate, isNewUser };
 
-  const [entriesRes, foodsRes] = await Promise.all([
+  const [entriesRes, foodsRes, savedMealsRes] = await Promise.all([
     supabase
       .from("food_entries")
       .select("*")
@@ -192,12 +192,24 @@ export async function getFoodsPageData(): Promise<FoodsPageData> {
       .select("*")
       .or(`owner_id.eq.${user.id},owner_id.is.null`)
       .order("created_at", { ascending: false })
-      .limit(RECENT_FOODS)
+      .limit(RECENT_FOODS),
+    supabase
+      .from("saved_meals")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
   ]);
 
   return {
     foods: (foodsRes.data ?? []).map(mapFood),
     entries: (entriesRes.data ?? []).map(mapEntry),
+    savedMeals: (savedMealsRes.data ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      meal: row.meal as SavedMeal["meal"],
+      items: (row.items as SavedMeal["items"]) ?? [],
+      createdAt: row.created_at as string,
+    })),
     serverDate,
     isNewUser
   };

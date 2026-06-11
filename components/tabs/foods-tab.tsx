@@ -23,5 +23,5 @@ export function FoodsTab() {
   }, [router]);
 
   if (!data) return <FoodsLoading />;
-  return <FoodLogger foods={data.foods} initialEntries={data.entries} serverDate={data.serverDate} />;
+  return <FoodLogger foods={data.foods} initialEntries={data.entries} savedMeals={data.savedMeals} serverDate={data.serverDate} />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
+import { BookmarkPlus, ChevronLeft, ChevronRight, Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,9 @@ import type { ServingMeasure } from "@/lib/nutrition";
 import { useRealtimeRefresh } from "@/lib/use-realtime-refresh";
 import { formatNumber } from "@/lib/utils";
 import { logFoodEntry, deleteFoodEntry, saveCustomFood, searchLocalFoods, getFoodEntriesForDate } from "@/lib/actions/food";
+import { saveMeal, deleteSavedMeal, logSavedMeal } from "@/lib/actions/meals";
 import { notifyDataChanged } from "@/lib/tab-cache";
-import type { Food, FoodEntry, MealType, Nutrients } from "@/lib/types";
+import type { Food, FoodEntry, MealType, Nutrients, SavedMeal, SavedMealItem } from "@/lib/types";
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -84,21 +85,17 @@ const FREQUENT_FOODS_SHOWN   = 5;
 const LOCAL_SEARCH_MIN_LENGTH   = 2;
 const LOCAL_SEARCH_DEBOUNCE_MS  = 150;
 
-function matchesSearch(food: Food, term: string) {
-  if (!term) return true;
-  return [food.name, food.brand, food.cuisine, food.source].filter(Boolean).join(" ").toLowerCase().includes(term);
-}
-
 export type FoodLoggerProps = {
   foods: Food[];
   initialEntries: FoodEntry[];
+  savedMeals: SavedMeal[];
   /** The UTC date the server used to load initialEntries (YYYY-MM-DD).
    *  When this differs from the client's local date, we know the server
    *  returned the wrong day (IST midnight edge case) and must refetch. */
   serverDate: string;
 };
 
-export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProps) {
+export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: FoodLoggerProps) {
   useRealtimeRefresh(["foods", "saved_foods", "food_entries"]);
 
   // ── Date state ─────────────────────────────────────────────────────────────
@@ -153,6 +150,12 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
   // Raw text for nutrient fields so partial decimals ("2.", "0.5") survive
   // typing — customFood keeps the parsed numbers for saving/estimates.
   const [nutrientInputs, setNutrientInputs] = useState<Record<string, string>>({});
+  // Saved meals — one-tap logging of a whole meal
+  const [meals, setMeals]                   = useState<SavedMeal[]>(savedMeals);
+  const [saveMealTarget, setSaveMealTarget] = useState<{ meal: MealType; label: string } | null>(null);
+  const [mealNameInput, setMealNameInput]   = useState("");
+  const [savingMeal, setSavingMeal]         = useState(false);
+  const [loggingMealId, setLoggingMealId]   = useState<string | null>(null);
 
   function handleNutrientInput(key: keyof Nutrients, raw: string) {
     if (!/^\d*\.?\d*$/.test(raw)) return; // digits and one dot only
@@ -312,6 +315,57 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
     setCustomFood((current) => ({ ...current, [field]: value }));
   }
 
+  // ── Saved meals ─────────────────────────────────────────────────────────────
+
+  function entryToMealItem(entry: FoodEntry): SavedMealItem {
+    const { foodId, foodName, serving, quantity, calories, protein, carbs, fat, fiber, iron, calcium, magnesium, zinc, potassium, sodium, vitaminD, vitaminB12 } = entry;
+    return { foodId, foodName, serving, quantity, calories, protein, carbs, fat, fiber, iron, calcium, magnesium, zinc, potassium, sodium, vitaminD, vitaminB12 };
+  }
+
+  async function handleSaveMeal() {
+    if (!saveMealTarget || !mealNameInput.trim()) return;
+    const items = entries.filter((e) => e.meal === saveMealTarget.meal).map(entryToMealItem);
+    setSavingMeal(true);
+    const result = await saveMeal(mealNameInput, saveMealTarget.meal, items);
+    setSavingMeal(false);
+    if (result?.error || !result?.meal) {
+      toast.error("Couldn't save meal", { description: result?.error });
+      return;
+    }
+    setMeals((current) => [result.meal!, ...current]);
+    toast.success(`Saved "${result.meal.name}"`, { description: "Log it any day with one tap." });
+    setSaveMealTarget(null);
+    setMealNameInput("");
+  }
+
+  async function handleLogSavedMeal(meal: SavedMeal) {
+    setLoggingMealId(meal.id);
+    const result = await logSavedMeal(meal.id, viewDate);
+    if (result?.error) {
+      toast.error(`Couldn't log ${meal.name}`, { description: result.error });
+      setLoggingMealId(null);
+      return;
+    }
+    // Refetch the day's entries so ids/timestamps come from the database
+    const { entries: fetched } = await getFoodEntriesForDate(viewDate);
+    setEntries(fetched);
+    setLoggingMealId(null);
+    const kcal = Math.round(meal.items.reduce((sum, item) => sum + item.calories, 0));
+    toast.success(`Logged ${meal.name}`, { description: `${meal.items.length} items · ${kcal} kcal` });
+    notifyDataChanged();
+  }
+
+  async function handleDeleteSavedMeal(meal: SavedMeal) {
+    setMeals((current) => current.filter((m) => m.id !== meal.id));
+    const result = await deleteSavedMeal(meal.id);
+    if (result?.error) {
+      toast.error("Couldn't delete saved meal", { description: result.error });
+      setMeals((current) => [meal, ...current]);
+      return;
+    }
+    toast.success(`Deleted "${meal.name}"`);
+  }
+
   const mealGroups = MEALS.map((meal) => {
     const mealEntries = entries.filter((entry) => entry.meal === meal.id);
     return { ...meal, entries: mealEntries, totals: sumEntries(mealEntries) };
@@ -445,6 +499,42 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
 
       {!loadingDate && (
         <>
+          {/* Saved meals — log a whole meal in one tap */}
+          {isToday && meals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <BookmarkPlus className="size-4 text-primary" />
+                  Saved Meals
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                {meals.map((meal) => {
+                  const kcal = Math.round(meal.items.reduce((sum, item) => sum + item.calories, 0));
+                  return (
+                    <div key={meal.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-background p-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{meal.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {MEALS.find((m) => m.id === meal.meal)?.label} · {meal.items.length} item{meal.items.length === 1 ? "" : "s"} · {kcal} kcal
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <Button size="sm" onClick={() => handleLogSavedMeal(meal)} disabled={loggingMealId !== null}>
+                          {loggingMealId === meal.id ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                          Log
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={() => handleDeleteSavedMeal(meal)} aria-label={`Delete ${meal.name}`}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Search results — appear right under the search bar while typing */}
           {isToday && isSearching && (
             <Card>
@@ -495,8 +585,23 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
                       <Utensils className="size-4 text-primary" />
                       {group.label}
                     </span>
-                    <span className="text-sm text-muted-foreground">
-                      {formatNumber(group.totals.calories)} kcal · P {formatNumber(group.totals.protein, 1)}g
+                    <span className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {formatNumber(group.totals.calories)} kcal · P {formatNumber(group.totals.protein, 1)}g
+                      </span>
+                      {isToday && group.entries.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSaveMealTarget({ meal: group.id, label: group.label });
+                            setMealNameInput(`My ${group.label.toLowerCase()}`);
+                          }}
+                        >
+                          <BookmarkPlus className="size-4" />
+                          Save meal
+                        </Button>
+                      )}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -706,6 +811,40 @@ export function FoodLogger({ foods, initialEntries, serverDate }: FoodLoggerProp
             </section>
           )}
         </>
+      )}
+
+      {/* Save meal modal */}
+      {saveMealTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setSaveMealTarget(null)}>
+          <Card className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle>Save {saveMealTarget.label.toLowerCase()} as a meal</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <p className="text-sm text-muted-foreground">
+                Saves everything currently logged under {saveMealTarget.label} ({entries.filter((e) => e.meal === saveMealTarget.meal).length} items) so you can log it again with one tap.
+              </p>
+              <div className="grid gap-2">
+                <Label htmlFor="meal-name">Meal name</Label>
+                <Input
+                  id="meal-name"
+                  autoFocus
+                  value={mealNameInput}
+                  onChange={(e) => setMealNameInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveMeal()}
+                  placeholder="e.g. My usual breakfast"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setSaveMealTarget(null)}>Cancel</Button>
+                <Button className="flex-1" onClick={handleSaveMeal} disabled={savingMeal || !mealNameInput.trim()}>
+                  {savingMeal ? <Loader2 className="size-4 animate-spin" /> : <BookmarkPlus className="size-4" />}
+                  Save meal
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Log amount modal */}

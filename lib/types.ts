@@ -101,3 +101,20 @@ export type DailyTrend = {
   weightKg?: number;
   adherence: number;
 };
+
+/** One food line inside a saved meal — a snapshot independent of the foods table. */
+export type SavedMealItem = Nutrients & {
+  foodId: string;
+  foodName: string;
+  serving: string;
+  quantity: number;
+};
+
+/** A named bundle of foods loggable in one tap (e.g. "My usual breakfast"). */
+export type SavedMeal = {
+  id: string;
+  name: string;
+  meal: MealType;
+  items: SavedMealItem[];
+  createdAt: string;
+};
