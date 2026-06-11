@@ -1,6 +1,6 @@
 "use client";
 
-import { BookmarkPlus, ChevronLeft, ChevronRight, Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
+import { BookmarkPlus, ChevronLeft, ChevronRight, Copy, Heart, Loader2, Plus, Search, Star, Trash2, Utensils, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -483,7 +483,17 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search paneer, dal, rice, chicken..." className="pl-9" />
+                  <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search paneer, dal, rice, chicken..." className="pl-9 pr-9" />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      aria-label="Clear search"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-4 gap-1 rounded-md border border-border bg-background p-1">
                   {MEALS.map((meal) => (
