@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { cn, formatNumber } from "@/lib/utils";
 
 const RADIUS = 42;
@@ -21,8 +24,38 @@ export type ProgressRingProps = {
   tone?: ProgressRingTone;
 };
 
+/** Animates a number from its current displayed value to `target` with an
+ *  ease-out curve — drives both the ring sweep and the count-up text.
+ *  Starts at 0 on mount, then animates between values on later updates
+ *  (e.g. after logging food). */
+function useAnimatedNumber(target: number, duration = 900): number {
+  const [display, setDisplay] = useState(0);
+  const displayRef = useRef(0);
+
+  useEffect(() => {
+    const from = displayRef.current;
+    if (from === target) return;
+
+    let raf: number;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const v = from + (target - from) * eased;
+      displayRef.current = v;
+      setDisplay(v);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+
+  return display;
+}
+
 export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: ProgressRingProps) {
-  const percent = goal ? Math.min(value / goal, 1) : 0;
+  const animatedValue = useAnimatedNumber(value);
+  const percent = goal ? Math.min(animatedValue / goal, 1) : 0;
   const offset = CIRCUMFERENCE - percent * CIRCUMFERENCE;
   const remaining = Math.max(goal - value, 0);
 
@@ -35,7 +68,7 @@ export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: Pro
             cx="50"
             cy="50"
             r={RADIUS}
-            className={cn("transition-all duration-700 ease-out group-hover:drop-shadow-[0_0_6px_currentColor]", RING_COLORS[tone])}
+            className={cn("group-hover:drop-shadow-[0_0_6px_currentColor]", RING_COLORS[tone])}
             strokeWidth="10"
             fill="none"
             strokeLinecap="round"
@@ -51,7 +84,7 @@ export function ProgressRing({ value, goal, label, unit, tone = "emerald" }: Pro
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="text-xl font-bold leading-tight tracking-tight">
-          {formatNumber(value, unit === "kg" ? 1 : 0)}
+          {formatNumber(animatedValue, unit === "kg" ? 1 : 0)}
         </p>
         <p className="text-xs text-muted-foreground">
           / {formatNumber(goal)} {unit}
