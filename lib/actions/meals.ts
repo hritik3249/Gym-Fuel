@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { MealType, SavedMeal, SavedMealItem } from "@/lib/types";
+import type { FoodEntry, MealType, SavedMeal, SavedMealItem } from "@/lib/types";
 import { updateStreak } from "@/lib/streak";
 
 function mapSavedMeal(row: Record<string, unknown>): SavedMeal {
@@ -74,35 +74,64 @@ export async function logSavedMeal(mealId: string, entryDate: string) {
   const saved = mapSavedMeal(row);
   if (saved.items.length === 0) return { error: "Meal has no items" };
 
-  const now = new Date().toISOString();
-  const { error } = await supabase.from("food_entries").insert(
-    saved.items.map((item) => ({
-      user_id: user.id,
-      food_id: null, // snapshot rows — original food may no longer exist
-      food_name: item.foodName,
-      meal: saved.meal,
-      serving: item.serving,
-      quantity: item.quantity,
-      entry_date: entryDate,
-      calories: item.calories,
-      protein: item.protein,
-      carbs: item.carbs,
-      fat: item.fat,
-      fiber: item.fiber,
-      iron: item.iron,
-      calcium: item.calcium,
-      magnesium: item.magnesium,
-      zinc: item.zinc,
-      potassium: item.potassium,
-      sodium: item.sodium,
-      vitamin_d: item.vitaminD,
-      vitamin_b12: item.vitaminB12,
-    })),
-  );
+  const { data: inserted, error } = await supabase
+    .from("food_entries")
+    .insert(
+      saved.items.map((item) => ({
+        user_id: user.id,
+        food_id: null, // snapshot rows — original food may no longer exist
+        food_name: item.foodName,
+        meal: saved.meal,
+        serving: item.serving,
+        quantity: item.quantity,
+        entry_date: entryDate,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        fiber: item.fiber,
+        iron: item.iron,
+        calcium: item.calcium,
+        magnesium: item.magnesium,
+        zinc: item.zinc,
+        potassium: item.potassium,
+        sodium: item.sodium,
+        vitamin_d: item.vitaminD,
+        vitamin_b12: item.vitaminB12,
+      })),
+    )
+    .select();
 
   if (error) return { error: error.message };
 
   await updateStreak(supabase, user.id, entryDate);
 
-  return { success: true, loggedAt: now };
+  // Return the inserted rows so the client can swap its optimistic entries
+  // for the real ones (correct ids/timestamps) without a second round trip.
+  return { success: true, entries: (inserted ?? []).map(mapInsertedEntry) };
+}
+
+function mapInsertedEntry(row: Record<string, unknown>): FoodEntry {
+  return {
+    id: row.id as string,
+    foodId: (row.food_id as string | null) ?? "",
+    foodName: row.food_name as string,
+    meal: row.meal as MealType,
+    serving: row.serving as string,
+    quantity: Number(row.quantity),
+    loggedAt: row.logged_at as string,
+    calories: Number(row.calories),
+    protein: Number(row.protein),
+    carbs: Number(row.carbs),
+    fat: Number(row.fat),
+    fiber: Number(row.fiber),
+    iron: Number(row.iron),
+    calcium: Number(row.calcium),
+    magnesium: Number(row.magnesium),
+    zinc: Number(row.zinc),
+    potassium: Number(row.potassium),
+    sodium: Number(row.sodium),
+    vitaminD: Number(row.vitamin_d),
+    vitaminB12: Number(row.vitamin_b12),
+  };
 }

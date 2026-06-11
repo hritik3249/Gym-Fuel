@@ -354,19 +354,31 @@ export function FoodLogger({ foods, initialEntries, savedMeals, serverDate }: Fo
   }
 
   async function handleLogSavedMeal(meal: SavedMeal) {
-    setLoggingMealId(meal.id);
-    const result = await logSavedMeal(meal.id, viewDate);
-    if (result?.error) {
-      toast.error(`Couldn't log ${meal.name}`, { description: result.error });
-      setLoggingMealId(null);
-      return;
-    }
-    // Refetch the day's entries so ids/timestamps come from the database
-    const { entries: fetched } = await getFoodEntriesForDate(viewDate);
-    setEntries(fetched);
-    setLoggingMealId(null);
+    // Optimistic: show the entries and toast immediately, sync in background.
+    const now = new Date().toISOString();
+    const optimistic: FoodEntry[] = meal.items.map((item) => ({
+      ...item,
+      id: crypto.randomUUID(),
+      meal: meal.meal,
+      loggedAt: now,
+    }));
+    const optimisticIds = new Set(optimistic.map((e) => e.id));
+    setEntries((current) => [...optimistic, ...current]);
     const kcal = Math.round(meal.items.reduce((sum, item) => sum + item.calories, 0));
     toast.success(`Logged ${meal.name}`, { description: `${meal.items.length} items · ${kcal} kcal` });
+
+    setLoggingMealId(meal.id);
+    const result = await logSavedMeal(meal.id, viewDate);
+    setLoggingMealId(null);
+
+    if (result?.error || !result?.entries) {
+      // Roll back the optimistic entries
+      setEntries((current) => current.filter((e) => !optimisticIds.has(e.id)));
+      toast.error(`Couldn't log ${meal.name}`, { description: result?.error });
+      return;
+    }
+    // Swap optimistic entries for the real database rows (correct ids/timestamps)
+    setEntries((current) => [...result.entries!, ...current.filter((e) => !optimisticIds.has(e.id))]);
     notifyDataChanged();
   }
 
